@@ -97,17 +97,24 @@ work. The GPUI desktop app sidesteps it entirely (native GPU).
 - Per-clip (non-composite) freeze capture — owner unconvinced; parked.
   Would need a single-element render pass in the GPU renderer.
 
-## Known pre-existing breakage (cleanup someday)
+## Quality gates (hardened 2026-07-26)
 
-- `keybindings/__tests__/persistence.test.ts` imports
-  `isActionWithOptionalArgs`, which does not exist anywhere — dead test file.
-- Mask tests need a canvas 2d context bun doesn't provide (DOM-dependent).
-- `custom mask point insertion` test asserts zero handles; code computes
-  ±0.1 — stale test or stale code, never ran in CI to catch it.
-- `resolve.test.ts` passes fractional ticks into the validated `mediaTime()`
-  constructor — test bug.
-- `eslint/rules/__tests__/prefer-object-params.test.mjs` uses `.only`,
-  blocked when `CI` is set.
+Baseline is GREEN: `bun test` (221 pass, 1 skip), `bunx tsc --noEmit`,
+`bun build:web` all pass locally and in CI (the CI test step was a no-op
+stub; it now runs typecheck + tests). `just verify` runs the full gate.
+Rule from here: red means the agent broke it — no tolerated failures.
+Full lint remains red (~112 pre-existing unsafe-assertion errors);
+lint files you touch, full lint-green after the stripping pass.
+
+Fixed along the way (were real runtime bugs, not just test issues):
+`isActionWithOptionalArgs`/`isShortcutKey` guards restored (custom
+keybindings crashed on load), stale positional `IndexedDBAdapter` /
+`stickersRegistry.register` call sites updated (silent no-ops at runtime).
+
+Remaining known breakage:
+
+- One text-mask snap test is `test.skip` — needs a canvas 2d context bun
+  does not provide (DOM-dependent).
 - `apps/web/drizzle.config.ts` points at the stale schema path
   `./src/lib/db/schema.ts` (real one: `src/db/schema.ts`).
 

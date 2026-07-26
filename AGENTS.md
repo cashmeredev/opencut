@@ -106,9 +106,10 @@ Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postg
 - Root `bunfig.toml` registers `[test] preload` → `apps/web/src/test-utils/mock-opencut-wasm.ts`: the published `opencut-wasm` package is wasm-pack bundler-target glue whose `.wasm` ESM import bun's test runner does not instantiate, so a faithful pure-TS mock (mirrors `rust/crates/time`, TICKS_PER_SECOND=120_000) is registered before any test module evaluates. Extend its export surface when a test transitively links new `opencut-wasm` imports.
 - ~30 test files, colocated in `__tests__/` dirs next to source: timeline placement/pipeline, retime, animation, fps, masks, params, keybindings, stickers, math. Deepest investment: `apps/web/src/services/storage/migrations/__tests__/` — 18 per-version-step tests (v0-to-v1 … v30-to-v31) with shared `helpers.ts` and `fixtures/` sample projects; copy this pattern when adding a storage migration.
 - Conventions: pure-function unit tests, nested describe blocks, deterministic dates. No coverage config anywhere.
-- CI (`.github/workflows/bun-ci.yml`, sole workflow) builds the WASM package and the Next app on ubuntu/windows/macos but its test step is a no-op stub (`echo "No tests implemented yet"`, continue-on-error); no lint, format, or typecheck gates. Tests run locally only.
+- CI (`.github/workflows/bun-ci.yml`, sole workflow) builds the WASM package and the Next app on ubuntu/windows/macos, then runs `bunx tsc --noEmit` and `bun test` from the repo root — all gates are real and expected to pass. `just verify` runs the same gate locally (tests + typecheck + build).
+- Full `bun lint:web` is NOT green: ~112 pre-existing upstream errors (mostly `@typescript-eslint/no-unsafe-type-assertion`). Lint the files you touched; full lint-green is deferred until after the planned feature stripping, which deletes many offending files.
 - Rust crates have `#[cfg(test)]` unit tests (time crate, bridge) reachable only via `cargo test -p <crate>` — not wired to scripts or CI.
-- `bunx tsc --noEmit` in `apps/web` reports ~27 lines of PRE-EXISTING upstream type errors (storage migrations v1-to-v2, stickers providers, placement tests). Only care about errors in files you touched.
+- `bunx tsc --noEmit` in `apps/web` is green and CI-gated; keep it that way.
 
 ## Fork Notes & Current Work
 
