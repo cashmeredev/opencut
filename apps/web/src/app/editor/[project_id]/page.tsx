@@ -14,6 +14,7 @@ import { EditorHeader } from "@/components/editor/editor-header";
 import { EditorProvider } from "@/components/providers/editor-provider";
 import { Onboarding } from "@/components/editor/onboarding";
 import { MigrationDialog } from "@/project/components/migration-dialog";
+import { FreezeFrameDialog } from "@/actions/components/freeze-frame-dialog";
 import { usePanelStore } from "@/editor/panel-store";
 import { usePasteMedia } from "@/media/use-paste-media";
 import { MobileGate } from "@/components/editor/mobile-gate";
@@ -50,6 +51,7 @@ export default function Editor() {
 					</div>
 					<Onboarding />
 					<MigrationDialog />
+					<FreezeFrameDialog />
 					<ChangelogNotification />
 				</div>
 			</EditorProvider>
