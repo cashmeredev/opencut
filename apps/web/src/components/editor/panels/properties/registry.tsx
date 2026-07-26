@@ -28,6 +28,7 @@ import { MasksTab } from "@/masks/components/masks-tab";
 import { SpeedTab } from "@/speed/components/speed-tab";
 import { GraphicTab } from "@/graphics/components/graphic-tab";
 import { OcShapesIcon } from "@/components/icons";
+import { FEATURES } from "@/features";
 
 const TRANSFORM_PARAM_KEYS = [
 	"transform.positionX",
@@ -251,7 +252,7 @@ function getVideoConfig({
 			buildSpeedTab({ element }),
 			buildBlendingTab({ element }),
 			buildMasksTab({ element }),
-			buildClipEffectsTab({ element }),
+			...(FEATURES.effects ? [buildClipEffectsTab({ element })] : []),
 		],
 	};
 }
@@ -267,7 +268,7 @@ function getImageConfig({
 			buildTransformTab({ element }),
 			buildBlendingTab({ element }),
 			buildMasksTab({ element }),
-			buildClipEffectsTab({ element }),
+			...(FEATURES.effects ? [buildClipEffectsTab({ element })] : []),
 		],
 	};
 }
@@ -282,7 +283,7 @@ function getStickerConfig({
 		tabs: [
 			buildTransformTab({ element }),
 			buildBlendingTab({ element }),
-			buildClipEffectsTab({ element }),
+			...(FEATURES.effects ? [buildClipEffectsTab({ element })] : []),
 		],
 	};
 }
@@ -299,7 +300,7 @@ function getGraphicConfig({
 			buildTransformTab({ element }),
 			buildBlendingTab({ element }),
 			buildMasksTab({ element }),
-			buildClipEffectsTab({ element }),
+			...(FEATURES.effects ? [buildClipEffectsTab({ element })] : []),
 		],
 	};
 }

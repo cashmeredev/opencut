@@ -13,6 +13,14 @@ import {
 	tabs,
 	useAssetsPanelStore,
 } from "@/components/editor/panels/assets/assets-panel-store";
+import { FEATURES } from "@/features";
+
+const VISIBLE_TAB_KEYS = TAB_KEYS.filter((tabKey) => {
+	if (tabKey === "sounds") return FEATURES.sounds;
+	if (tabKey === "stickers") return FEATURES.stickers;
+	if (tabKey === "effects") return FEATURES.effects;
+	return true;
+});
 
 export function TabBar() {
 	const { activeTab, setActiveTab } = useAssetsPanelStore();
@@ -51,7 +59,7 @@ export function TabBar() {
 				ref={scrollRef}
 				className="scrollbar-hidden relative flex size-full p-1 flex-col items-center justify-start gap-0.5 overflow-y-auto"
 			>
-				{TAB_KEYS.map((tabKey) => {
+				{VISIBLE_TAB_KEYS.map((tabKey) => {
 					const tab = tabs[tabKey];
 					return (
 						<Tooltip key={tabKey} delayDuration={10}>

@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from "react";
 import { useEditor } from "@/editor/use-editor";
+import { FEATURES } from "@/features";
 import { useAssetsPanelStore } from "@/components/editor/panels/assets/assets-panel-store";
 import { AudioWaveform, WAVEFORM_GAIN_SAMPLE_COUNT } from "./audio-waveform";
 import { AudioVolumeLine } from "./audio-volume-line";
@@ -1123,7 +1124,7 @@ function TiledMediaContent({
 			<MediaElementHeader
 				name={mediaAsset?.name}
 				leading={
-					hasElementEffects({ element }) ? (
+					FEATURES.effects && hasElementEffects({ element }) ? (
 						<EffectsButton element={element} track={track} />
 					) : null
 				}

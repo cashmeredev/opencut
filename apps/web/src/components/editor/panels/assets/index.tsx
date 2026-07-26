@@ -10,16 +10,17 @@ import { SoundsView } from "@/sounds/components/assets-view";
 import { StickersView } from "@/stickers/components/assets-view";
 import { TextView } from "@/text/components/assets-view";
 import { EffectsView } from "@/effects/components/assets-view";
+import { FEATURES } from "@/features";
 
 export function AssetsPanel() {
 	const { activeTab } = useAssetsPanelStore();
 
 	const viewMap: Record<Tab, React.ReactNode> = {
 		media: <MediaView />,
-		sounds: <SoundsView />,
+		sounds: FEATURES.sounds ? <SoundsView /> : null,
 		text: <TextView />,
-		stickers: <StickersView />,
-		effects: <EffectsView />,
+		stickers: FEATURES.stickers ? <StickersView /> : null,
+		effects: FEATURES.effects ? <EffectsView /> : null,
 		transitions: (
 			<div className="text-muted-foreground p-4">
 				Transitions view coming soon...
