@@ -44,6 +44,14 @@ typecheck:
 format:
     cd apps/web && bun run format
 
+# Full local quality gate: tests, typecheck, production build.
+# Full lint is NOT part of the gate yet (~112 pre-existing upstream errors);
+# lint the files you touched with `just lint`.
+verify:
+    bun test
+    cd apps/web && bunx tsc --noEmit
+    bun build:web
+
 # Build the Rust WASM package (run ./script/setup-rust once first)
 wasm:
     bun build:wasm
