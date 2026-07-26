@@ -103,6 +103,7 @@ Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postg
 ## Testing & QA
 
 - Framework: Bun's built-in test runner (`import from "bun:test"`), zero config. Run everything with `bun test` from the repo root (discovers across workspaces). Single file: `bun test <path>`.
+- Root `bunfig.toml` registers `[test] preload` → `apps/web/src/test-utils/mock-opencut-wasm.ts`: the published `opencut-wasm` package is wasm-pack bundler-target glue whose `.wasm` ESM import bun's test runner does not instantiate, so a faithful pure-TS mock (mirrors `rust/crates/time`, TICKS_PER_SECOND=120_000) is registered before any test module evaluates. Extend its export surface when a test transitively links new `opencut-wasm` imports.
 - ~30 test files, colocated in `__tests__/` dirs next to source: timeline placement/pipeline, retime, animation, fps, masks, params, keybindings, stickers, math. Deepest investment: `apps/web/src/services/storage/migrations/__tests__/` — 18 per-version-step tests (v0-to-v1 … v30-to-v31) with shared `helpers.ts` and `fixtures/` sample projects; copy this pattern when adding a storage migration.
 - Conventions: pure-function unit tests, nested describe blocks, deterministic dates. No coverage config anywhere.
 - CI (`.github/workflows/bun-ci.yml`, sole workflow) builds the WASM package and the Next app on ubuntu/windows/macos but its test step is a no-op stub (`echo "No tests implemented yet"`, continue-on-error); no lint, format, or typecheck gates. Tests run locally only.
@@ -118,7 +119,8 @@ The timeline toolbar snowflake button (upstream had it disabled with a "coming s
 Files:
 
 - `apps/web/src/actions/definitions.ts` — registered the `freeze-frame` action (category `editing`, no default keybinding; bindable in the shortcuts UI).
-- `apps/web/src/actions/use-editor-actions.ts` — the `freeze-frame` handler: target resolution, capture, asset creation (sets `url` + `thumbnailUrl`, both required — see pitfalls), split/move/insert.
+- `apps/web/src/actions/use-editor-actions.ts` — the `freeze-frame` handler: target resolution, capture, asset creation (sets `url` + `thumbnailUrl`, both required — see pitfalls), then a single `BatchCommand` (asset add, split, shift, insert) executed once.
+- `apps/web/src/commands/timeline/element/shift-split-remainder.ts` — `ShiftSplitRemainderCommand`: moves the right-side elements a `SplitElementsCommand` produces; reads `getRightSideElements()` lazily at `execute()` so it can be composed in a `BatchCommand` after the split (and rebuilds on redo, which re-generates right-side ids).
 - `apps/web/src/core/managers/renderer-manager.ts` — new public `captureFrame(): Promise<Blob | null>`; `createSnapshot()` (used by save/copy snapshot) was refactored to reuse it.
 - `apps/web/src/timeline/components/timeline-toolbar.tsx` — button enabled, wired to the action via `handleAction`; `canFreezeFrame` selector disables it unless a video element is under the playhead.
 - `apps/web/src/media/processing.ts` — `generateImageThumbnail` is now exported for reuse by the handler.
@@ -128,7 +130,7 @@ Behavior details and known limitations:
 - Freeze duration is a fixed 3 seconds (`mediaTimeFromSeconds({ seconds: 3 })` in the handler); adjust by trimming the inserted element.
 - The still is a composite capture of the whole canvas at the current time — overlays, text, and stickers visible at that moment are baked in. CapCut freezes only the clip itself; per-clip capture would need a single-element render pass.
 - Target is the first selected video element under the playhead (or the first video element under the playhead if nothing is selected). With stacked videos on several tracks it may pick a non-topmost one.
-- One freeze produces several undo steps (split, move, insert, asset add are separate commands). Proper fix: a dedicated `FreezeFrameCommand` or `BatchCommand`.
+- One freeze is a single undo step: the handler builds one `BatchCommand` (`AddMediaAssetCommand` + `SplitElementsCommand` + `ShiftSplitRemainderCommand` + `InsertElementCommand`) and executes it once via `editor.command.execute`.
 - Freeze-frame assets survive reload: `storageService` recreates object URLs from the stored `File` on project load, and the thumbnail is a data URL.
 
 ### Pitfalls
@@ -138,7 +140,6 @@ Behavior details and known limitations:
 
 ### Open next steps
 
-1. Commit the freeze-frame work (everything above is uncommitted working-tree state) and the `flake.nix`.
-2. Single-command undo for freeze frame (`FreezeFrameCommand`/`BatchCommand`).
-3. `MediaPreview` empty-`src` guard.
-4. Optional: freeze-duration prompt, per-clip (non-composite) capture, default keybinding.
+1. ~~Commit the freeze-frame work~~ done (`fc0a801e`); ~~single-command undo~~ done (`BatchCommand` + `ShiftSplitRemainderCommand`).
+2. `MediaPreview` empty-`src` guard.
+3. Optional: freeze-duration prompt, per-clip (non-composite) capture, default keybinding.
