@@ -16,7 +16,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/utils/ui";
-import { DEFAULT_LOGO_URL, SITE_URL } from "@/site/brand";
+import { DEFAULT_LOGO_URL } from "@/site/brand";
 import { SOCIAL_LINKS } from "@/site/social";
 import {
 	ContextMenu,
@@ -41,10 +41,6 @@ export function Header() {
 		{
 			label: "Sponsors",
 			href: "/sponsors",
-		},
-		{
-			label: "Blog",
-			href: "/blog",
 		},
 	];
 

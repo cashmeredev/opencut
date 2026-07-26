@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { RiDiscordFill, RiTwitterXLine } from "react-icons/ri";
+import { RiTwitterXLine } from "react-icons/ri";
 import { FaGithub } from "react-icons/fa6";
 import Image from "next/image";
 import { DEFAULT_LOGO_URL } from "@/site/brand";
@@ -13,23 +13,30 @@ interface FooterLink {
 	href: string;
 }
 
-type CategoryLinks = Record<Category, FooterLink[]>;
+interface LinkCategory {
+	category: Category;
+	links: FooterLink[];
+}
 
-const links: CategoryLinks = {
-	resources: [
-		{ label: "Roadmap", href: "/roadmap" },
-		{ label: "Changelog", href: "/changelog" },
-		{ label: "Blog", href: "/blog" },
-		{ label: "Privacy", href: "/privacy" },
-		{ label: "Terms of use", href: "/terms" },
-	],
-	company: [
-		{ label: "Contributors", href: "/contributors" },
-		{ label: "Sponsors", href: "/sponsors" },
-		{ label: "Brand", href: "/brand" },
-		{ label: "About", href: `${SOCIAL_LINKS.github}/blob/main/README.md` },
-	],
-};
+const linkCategories: LinkCategory[] = [
+	{
+		category: "resources",
+		links: [
+			{ label: "Roadmap", href: "/roadmap" },
+			{ label: "Privacy", href: "/privacy" },
+			{ label: "Terms of use", href: "/terms" },
+		],
+	},
+	{
+		category: "company",
+		links: [
+			{ label: "Contributors", href: "/contributors" },
+			{ label: "Sponsors", href: "/sponsors" },
+			{ label: "Brand", href: "/brand" },
+			{ label: "About", href: `${SOCIAL_LINKS.github}/blob/main/README.md` },
+		],
+	},
+];
 
 export function Footer() {
 	return (
@@ -68,25 +75,17 @@ export function Footer() {
 							>
 								<RiTwitterXLine className="size-5" />
 							</Link>
-							<Link
-								href={SOCIAL_LINKS.discord}
-								className="text-muted-foreground hover:text-foreground transition-colors"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<RiDiscordFill className="size-5" />
-							</Link>
 						</div>
 					</div>
 
 					<div className="flex items-start justify-start gap-12 py-2">
-						{(Object.keys(links) as Category[]).map((category) => (
+						{linkCategories.map(({ category, links: categoryLinks }) => (
 							<div key={category} className="flex flex-col gap-2">
 								<h3 className="text-foreground font-semibold">
 									{capitalizeFirstLetter({ string: category })}
 								</h3>
 								<ul className="space-y-2 text-sm">
-									{links[category].map((link) => (
+									{categoryLinks.map((link) => (
 										<li key={link.href}>
 											<Link
 												href={link.href}
