@@ -1,0 +1,7 @@
+# The published opencut-wasm package is wasm-pack bundler-target glue that
+# imports its .wasm as an ESM module with instance exports, which bun's test
+# runner does not instantiate. Register a faithful pure-TS stand-in before any
+# test module evaluates so tests importing `@/wasm` (directly or transitively)
+# can run. See the preload file for details.
+[test]
+preload = ["./apps/web/src/test-utils/mock-opencut-wasm.ts"]
