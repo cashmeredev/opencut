@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { KeyboardEvent, MouseEvent } from "react";
-import { useEffect, useState } from "react";
+import type { ChangeEvent, KeyboardEvent, MouseEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { EditorCore } from "@/core";
 import { MigrationDialog } from "@/project/components/migration-dialog";
@@ -45,6 +45,8 @@ import {
 	Edit03Icon,
 	ArrowDown02Icon,
 	InformationCircleIcon,
+	Download01Icon,
+	Upload01Icon,
 } from "@hugeicons/core-free-icons";
 import { OcVideoIcon } from "@/components/icons";
 import { Label } from "@/components/ui/label";
@@ -184,6 +186,7 @@ function ProjectsHeader() {
 
 				<div className="flex items-center gap-3 md:gap-4">
 					<SearchBar className="hidden md:block" />
+					<ImportProjectButton />
 					<NewProjectButton />
 				</div>
 			</div>
@@ -527,6 +530,63 @@ function NewProjectButton() {
 	);
 }
 
+function ImportProjectButton() {
+	const editor = useEditor();
+	const router = useRouter();
+	const fileInputRef = useRef<HTMLInputElement>(null);
+	const [isImporting, setIsImporting] = useState(false);
+
+	const handleImportClick = () => {
+		fileInputRef.current?.click();
+	};
+
+	const handleFileChange = async ({
+		event,
+	}: {
+		event: ChangeEvent<HTMLInputElement>;
+	}) => {
+		const file = event.target.files?.[0];
+		event.target.value = "";
+		if (!file || isImporting) return;
+
+		setIsImporting(true);
+		try {
+			const projectId = await editor.project.importArchive({ file });
+			if (projectId) {
+				router.push(`/editor/${projectId}`);
+			}
+		} finally {
+			setIsImporting(false);
+		}
+	};
+
+	return (
+		<>
+			<input
+				ref={fileInputRef}
+				type="file"
+				accept=".ocp"
+				className="hidden"
+				onChange={(event) => void handleFileChange({ event })}
+			/>
+			<Button
+				type="button"
+				size="lg"
+				variant="outline"
+				className="flex px-5 md:px-6"
+				disabled={isImporting}
+				onClick={handleImportClick}
+			>
+				<HugeiconsIcon icon={Upload01Icon} className="md:hidden" />
+				<span className="text-sm font-medium hidden md:block">
+					{isImporting ? "Importing…" : "Import"}
+				</span>
+				<span className="text-sm font-medium block md:hidden">Import</span>
+			</Button>
+		</>
+	);
+}
+
 function ProjectItem({
 	project,
 	allProjectIds,
@@ -558,6 +618,9 @@ function ProjectItem({
 	};
 	const handleDeleteClick = () => setIsDeleteDialogOpen(true);
 	const handleInfoClick = () => setIsInfoDialogOpen(true);
+	const handleExport = async () => {
+		await editor.project.exportArchive({ id: project.id });
+	};
 	const handleDeleteConfirm = async () => {
 		await deleteProjects({ editor, ids: [project.id] });
 		setIsDeleteDialogOpen(false);
@@ -675,6 +738,7 @@ function ProjectItem({
 					variant="list"
 					onRenameClick={handleRename}
 					onDuplicateClick={handleDuplicate}
+					onExportClick={handleExport}
 					onDeleteClick={handleDeleteClick}
 					onInfoClick={handleInfoClick}
 				/>
@@ -716,6 +780,7 @@ function ProjectItem({
 										onOpenChange={setIsDropdownOpen}
 										onRenameClick={handleRename}
 										onDuplicateClick={handleDuplicate}
+										onExportClick={handleExport}
 										onDeleteClick={handleDeleteClick}
 										onInfoClick={handleInfoClick}
 									/>
@@ -729,6 +794,7 @@ function ProjectItem({
 				<ProjectContextMenuContent
 					onRenameClick={handleRename}
 					onDuplicateClick={handleDuplicate}
+					onExportClick={handleExport}
 					onDeleteClick={handleDeleteClick}
 					onInfoClick={handleInfoClick}
 				/>
@@ -763,11 +829,13 @@ function ProjectItem({
 function ProjectContextMenuContent({
 	onRenameClick,
 	onDuplicateClick,
+	onExportClick,
 	onDeleteClick,
 	onInfoClick,
 }: {
 	onRenameClick: () => void;
 	onDuplicateClick: () => void;
+	onExportClick: () => void;
 	onDeleteClick: () => void;
 	onInfoClick: () => void;
 }) {
@@ -784,6 +852,12 @@ function ProjectContextMenuContent({
 				onClick={onDuplicateClick}
 			>
 				Duplicate
+			</ContextMenuItem>
+			<ContextMenuItem
+				icon={<HugeiconsIcon icon={Download01Icon} />}
+				onClick={onExportClick}
+			>
+				Export
 			</ContextMenuItem>
 			<ContextMenuItem
 				icon={<HugeiconsIcon icon={InformationCircleIcon} />}
@@ -809,6 +883,7 @@ function ProjectMenu({
 	variant = "grid",
 	onRenameClick,
 	onDuplicateClick,
+	onExportClick,
 	onDeleteClick,
 	onInfoClick,
 }: {
@@ -817,6 +892,7 @@ function ProjectMenu({
 	variant?: "grid" | "list";
 	onRenameClick: () => void;
 	onDuplicateClick: () => void;
+	onExportClick: () => void;
 	onDeleteClick: () => void;
 	onInfoClick: () => void;
 }) {
@@ -848,6 +924,11 @@ function ProjectMenu({
 
 	const handleDuplicate = () => {
 		onDuplicateClick();
+		onOpenChange(false);
+	};
+
+	const handleExport = () => {
+		onExportClick();
 		onOpenChange(false);
 	};
 
@@ -902,6 +983,10 @@ function ProjectMenu({
 				<DropdownMenuItem onClick={handleDuplicate}>
 					<HugeiconsIcon icon={Copy01Icon} />
 					Duplicate
+				</DropdownMenuItem>
+				<DropdownMenuItem onClick={handleExport}>
+					<HugeiconsIcon icon={Download01Icon} />
+					Export
 				</DropdownMenuItem>
 				<DropdownMenuItem onClick={handleInfoClick}>
 					<HugeiconsIcon icon={InformationCircleIcon} />

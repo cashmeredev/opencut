@@ -8,6 +8,12 @@ import type {
 	TTimelineViewState,
 } from "@/project/types";
 import type { ExportOptions, ExportResult, ExportState } from "@/export";
+import {
+	ProjectArchiveError,
+	exportProjectArchive,
+	importProjectArchive,
+} from "@/project/transfer";
+import { downloadBlob } from "@/utils/browser";
 import { storageService } from "@/services/storage/service";
 import { toast } from "sonner";
 import { generateUUID } from "@/utils/id";
@@ -283,6 +289,7 @@ export class ProjectManager {
 					Promise.all([
 						storageService.deleteProjectMedia({ projectId: id }),
 						storageService.deleteProject({ id }),
+						this.editor.versions.deleteVersionsForProject({ projectId: id }),
 					]),
 				),
 			);
@@ -703,5 +710,55 @@ export class ProjectManager {
 		this.listeners.forEach((fn) => {
 			fn();
 		});
+	}
+
+	async exportArchive({ id }: { id: string }): Promise<void> {
+		try {
+			if (this.active?.metadata.id === id) {
+				await this.editor.save.flush();
+			}
+			const { blob, fileName, missingMediaIds } = await exportProjectArchive({
+				projectId: id,
+			});
+			if (missingMediaIds.length > 0) {
+				toast.warning(
+					missingMediaIds.length === 1
+						? "1 media file is missing from storage and was not included in the export"
+						: `${missingMediaIds.length} media files are missing from storage and were not included in the export`,
+				);
+			}
+			downloadBlob({ blob, filename: fileName });
+		} catch (error) {
+			console.error("Failed to export project:", error);
+			toast.error("Failed to export project", {
+				description:
+					error instanceof Error ? error.message : "Please try again",
+			});
+		}
+	}
+
+	async importArchive({ file }: { file: File }): Promise<string | null> {
+		try {
+			const { project } = await importProjectArchive({
+				file,
+				existingNames: this.savedProjects.map((saved) => saved.name),
+			});
+			this.updateMetadata(project);
+			toast.success(`Imported "${project.metadata.name}"`);
+			return project.metadata.id;
+		} catch (error) {
+			console.error("Failed to import project:", error);
+			if (error instanceof ProjectArchiveError) {
+				toast.error("Couldn't import project", {
+					description: error.message,
+				});
+			} else {
+				toast.error("Failed to import project", {
+					description:
+						error instanceof Error ? error.message : "Please try again",
+				});
+			}
+			return null;
+		}
 	}
 }
