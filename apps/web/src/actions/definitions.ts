@@ -152,6 +152,22 @@ export const ACTIONS = {
 		category: "assets",
 		args: { projectId: "string", assetIds: "string[]" },
 	},
+	"voice-over": {
+		description: "Record voice-over at playhead",
+		category: "editing",
+	},
+	"create-checkpoint": {
+		description: "Create named checkpoint",
+		category: "history",
+	},
+	"toggle-versions-panel": {
+		description: "Toggle versions panel",
+		category: "history",
+	},
+	"export-project-archive": {
+		description: "Export project as single file (.ocp)",
+		category: "controls",
+	},
 } as const satisfies Record<string, TActionBaseDefinition>;
 
 export type TAction = keyof typeof ACTIONS;

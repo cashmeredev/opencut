@@ -28,6 +28,7 @@ import {
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { toast } from "sonner";
 import { generateImageThumbnail } from "@/media/processing";
+import { useFreezeFrameStore } from "@/actions/freeze-frame-store";
 import {
 	AddMediaAssetCommand,
 	BatchCommand,
@@ -35,6 +36,16 @@ import {
 	ShiftSplitRemainderCommand,
 	SplitElementsCommand,
 } from "@/commands";
+import { useVersionsStore } from "@/versions/versions-store";
+import {
+	cancelVoiceOverRecording,
+	getFileExtensionForMimeType,
+	getVoiceOverErrorMessage,
+	startVoiceOverRecording,
+	stopVoiceOverRecording,
+} from "@/voiceover/recorder";
+import type { VoiceOverRecordingResult } from "@/voiceover/recorder";
+import { useVoiceOverStore } from "@/voiceover/voiceover-store";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -46,6 +57,8 @@ export function useEditorActions() {
 	const toggleSnapping = useTimelineStore((s) => s.toggleSnapping);
 	const rippleEditingEnabled = useTimelineStore((s) => s.rippleEditingEnabled);
 	const toggleRippleEditing = useTimelineStore((s) => s.toggleRippleEditing);
+	const openCheckpointDialog = useVersionsStore((s) => s.openCheckpointDialog);
+	const toggleVersionsPanel = useVersionsStore((s) => s.togglePanel);
 	const hasTimelineSelection =
 		selectedElements.length > 0 ||
 		selectedKeyframes.length > 0 ||
@@ -408,6 +421,13 @@ export function useEditorActions() {
 				return;
 			}
 
+			const freezeDurationSeconds = await useFreezeFrameStore
+				.getState()
+				.requestDuration();
+			if (freezeDurationSeconds === null) {
+				return;
+			}
+
 			const blob = await editor.renderer.captureFrame();
 			if (!blob) {
 				toast.error("Failed to capture frame");
@@ -421,7 +441,9 @@ export function useEditorActions() {
 				imageFile: file,
 			});
 
-			const freezeDuration = mediaTimeFromSeconds({ seconds: 3 });
+			const freezeDuration = mediaTimeFromSeconds({
+				seconds: freezeDurationSeconds,
+			});
 			const addMediaCommand = new AddMediaAssetCommand({
 				projectId: activeProject.metadata.id,
 				asset: {
@@ -608,6 +630,107 @@ export function useEditorActions() {
 				projectId: args.projectId,
 				ids: args.assetIds,
 			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"create-checkpoint",
+		() => {
+			openCheckpointDialog();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"toggle-versions-panel",
+		() => {
+			toggleVersionsPanel();
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"voice-over",
+		async () => {
+			const voiceOverState = useVoiceOverStore.getState();
+
+			if (voiceOverState.status === "idle") {
+				try {
+					await startVoiceOverRecording();
+				} catch (error) {
+					toast.error(getVoiceOverErrorMessage({ error }));
+					return;
+				}
+				useVoiceOverStore.getState().startRecording({
+					playheadTime: editor.playback.getCurrentTime(),
+				});
+				return;
+			}
+
+			useVoiceOverStore.getState().stopRecording();
+
+			const activeProject = editor.project.getActive();
+			if (!activeProject) {
+				cancelVoiceOverRecording();
+				return;
+			}
+
+			let recording: VoiceOverRecordingResult;
+			try {
+				recording = await stopVoiceOverRecording();
+			} catch (error) {
+				toast.error(getVoiceOverErrorMessage({ error }));
+				return;
+			}
+
+			if (recording.blob.size === 0) {
+				toast.error("Voice-over recording is empty");
+				return;
+			}
+
+			const file = new File(
+				[recording.blob],
+				`voice-over.${getFileExtensionForMimeType({ mimeType: recording.mimeType })}`,
+				{ type: recording.mimeType },
+			);
+			const addMediaCommand = new AddMediaAssetCommand({
+				projectId: activeProject.metadata.id,
+				asset: {
+					file,
+					name: "Voice over",
+					type: "audio",
+					url: URL.createObjectURL(file),
+					duration: recording.durationSeconds,
+				},
+			});
+			const insertCommand = new InsertElementCommand({
+				element: buildElementFromMedia({
+					mediaId: addMediaCommand.getAssetId(),
+					mediaType: "audio",
+					name: "Voice over",
+					duration: mediaTimeFromSeconds({
+						seconds: recording.durationSeconds,
+					}),
+					startTime:
+						voiceOverState.playheadStartTime ??
+						editor.playback.getCurrentTime(),
+				}),
+				placement: { mode: "auto", trackType: "audio" },
+			});
+			editor.command.execute({
+				command: new BatchCommand([addMediaCommand, insertCommand]),
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"export-project-archive",
+		() => {
+			const projectId = editor.project.getActiveOrNull()?.metadata.id;
+			if (!projectId) return;
+			void editor.project.exportArchive({ id: projectId });
 		},
 		undefined,
 	);
