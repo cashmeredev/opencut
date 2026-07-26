@@ -42,7 +42,7 @@ Domain folders also include `animation/`, `effects/`, `masks/`, `params/`, `prev
 
 ## Development Commands
 
-Run from repo root unless noted. `flake.nix` provides a devshell (`nix develop`) with bun (1.3.x) + nodejs (24); the pinned bun 1.2.18 works but so does 1.3.x.
+Run from repo root unless noted. `flake.nix` provides a devshell (`nix develop`) with bun (1.3.x) + nodejs (24) + just; the pinned bun 1.2.18 works but so does 1.3.x. The root `justfile` wraps the common commands below (`just` lists them; e.g. `just dev`, `just test <path>`).
 
 ```bash
 bun install
