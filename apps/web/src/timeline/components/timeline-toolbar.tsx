@@ -43,12 +43,17 @@ import {
 	Layers01Icon,
 	Chart03Icon,
 	Unlink02Icon,
+	MicIcon,
+	StopIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { OcRippleIcon } from "@/components/icons";
 import { GraphEditorPopover } from "./graph-editor/popover";
 import { PopoverTrigger } from "@/components/ui/popover";
 import { useGraphEditorController } from "./graph-editor/use-controller";
+import { formatElapsedSeconds } from "@/voiceover/recorder";
+import { useRecordingElapsedSeconds } from "@/voiceover/use-recording-elapsed";
+import { useVoiceOverStore } from "@/voiceover/voiceover-store";
 
 export function TimelineToolbar({
 	zoomLevel,
@@ -95,6 +100,10 @@ function ToolbarLeftSection() {
 	const isCurrentlyBookmarked = useEditor((e) =>
 		e.scenes.isBookmarked({ time: e.playback.getCurrentTime() }),
 	);
+	const isRecordingVoiceOver = useVoiceOverStore(
+		(state) => state.status === "recording",
+	);
+	const voiceOverElapsedSeconds = useRecordingElapsedSeconds();
 	const canFreezeFrame = useEditor((e) => {
 		const time = e.playback.getCurrentTime();
 		const { overlay, main } = e.scenes.getActiveScene().tracks;
@@ -201,6 +210,23 @@ function ToolbarLeftSection() {
 					disabled={!canFreezeFrame}
 					onClick={({ event }) => handleAction({ action: "freeze-frame", event })}
 				/>
+
+				<ToolbarButton
+					icon={
+						<HugeiconsIcon icon={isRecordingVoiceOver ? StopIcon : MicIcon} />
+					}
+					tooltip={
+						isRecordingVoiceOver ? "Stop voice-over" : "Record voice-over"
+					}
+					isActive={isRecordingVoiceOver}
+					onClick={({ event }) => handleAction({ action: "voice-over", event })}
+				/>
+
+				{isRecordingVoiceOver && (
+					<span className="text-destructive min-w-9 text-center text-xs tabular-nums">
+						{formatElapsedSeconds({ seconds: voiceOverElapsedSeconds })}
+					</span>
+				)}
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={Delete02Icon} />}
