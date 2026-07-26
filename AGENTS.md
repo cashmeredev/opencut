@@ -32,6 +32,10 @@ Typical flow (split at playhead, key "s"): keybindings-store → `invokeAction("
 | `apps/web/src/media/` | Media processing, thumbnails, upload, mediabunny wrappers |
 | `apps/web/src/services/` | `renderer/` (GPU), `storage/` (IndexedDB + versioned migrations), `transcription/`, caches |
 | `apps/web/src/wasm/` | `@/wasm` wrapper over `opencut-wasm` — only `wasm/media-time.ts` imports the package directly |
+| `apps/web/src/versions/` | Git-like project versioning: version store (IDB + in-memory), `VersionsManager`, media pinning, versions popover UI |
+| `apps/web/src/voiceover/` | Voice-over recording (MediaRecorder) → audio asset → timeline insert, one undo step |
+| `apps/web/src/project/transfer/` | Single-file `.ocp` import/export (fflate zip: project.json + media + manifest) |
+| `apps/web/src/features.ts` | `FEATURES` flags hiding unfinished upstream domains (sounds/stickers/effects) from the UI |
 | `apps/web/src/components/` | Shared React: `ui/` (shadcn-style radix), `editor/`, `providers/` |
 | `apps/web/src/app/` | App Router pages + `api/` routes |
 | `rust/crates/` | Shared Rust crates; `rust/wasm/` compiles them to the `opencut-wasm` npm package |
@@ -115,7 +119,7 @@ Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postg
 
 ### Freeze frame (implemented, working)
 
-The timeline toolbar snowflake button (upstream had it disabled with a "coming soon" tooltip) now freezes the frame at the playhead: it captures the composited canvas as PNG, adds it as an image media asset, splits the video element at the playhead, shifts the right part right by the freeze duration, and inserts a 3-second image element in the gap.
+The timeline toolbar snowflake button freezes the frame at the playhead: a duration prompt (persisted last-used value, cancel aborts cleanly), then it captures the composited canvas as PNG, adds it as an image media asset, splits the video element at the playhead, shifts the right part right by the freeze duration, and inserts the still image element in the gap — as ONE undo step (`BatchCommand` + `ShiftSplitRemainderCommand`).
 
 Files:
 
@@ -128,7 +132,7 @@ Files:
 
 Behavior details and known limitations:
 
-- Freeze duration is a fixed 3 seconds (`mediaTimeFromSeconds({ seconds: 3 })` in the handler); adjust by trimming the inserted element.
+- Freeze duration comes from the prompt store (`actions/freeze-frame-store.ts`), default/last-used prefilled.
 - The still is a composite capture of the whole canvas at the current time — overlays, text, and stickers visible at that moment are baked in. CapCut freezes only the clip itself; per-clip capture would need a single-element render pass.
 - Target is the first selected video element under the playhead (or the first video element under the playhead if nothing is selected). With stacked videos on several tracks it may pick a non-topmost one.
 - One freeze is a single undo step: the handler builds one `BatchCommand` (`AddMediaAssetCommand` + `SplitElementsCommand` + `ShiftSplitRemainderCommand` + `InsertElementCommand`) and executes it once via `editor.command.execute`.
