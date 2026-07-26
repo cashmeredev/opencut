@@ -1,5 +1,6 @@
 import { Command, type CommandResult } from "@/commands/base-command";
 import { EditorCore } from "@/core";
+import { toast } from "sonner";
 import type { MediaAsset } from "@/media/types";
 import { buildWaveformSourceKey } from "@/media/waveform-summary";
 import { storageService } from "@/services/storage/service";
@@ -30,6 +31,21 @@ export class RemoveMediaAssetCommand extends Command {
 
 	execute(): CommandResult | undefined {
 		const editor = EditorCore.getInstance();
+
+		// Media pinning: a stored project version may still reference this
+		// asset; deleting it would break restores (notes/project-versioning.md).
+		if (
+			editor.versions.isMediaIdPinned({
+				projectId: this.projectId,
+				mediaId: this.assetId,
+			})
+		) {
+			toast.error("Media is used in a saved version", {
+				description: "Delete the checkpoints that reference it first.",
+			});
+			return;
+		}
+
 		const assets = editor.media.getAssets();
 
 		this.savedAssets = [...assets];

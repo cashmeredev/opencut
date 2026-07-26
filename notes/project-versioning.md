@@ -45,21 +45,21 @@ position stays reachable.
 - Ring buffer: keep the newest **20** auto versions per project; older auto
   versions are deleted on write. Named versions never rotate.
 
-### Media storage
+### Media storage (revised for v1)
 
-Snapshots share media, they don't copy it. Media blobs move to a
-**content-addressed store**: `mediaBlobs: { hash, blob }` with
-`MediaAsset` records referencing hashes. A blob is collected only when no
-project document and no version snapshot references it. This keeps 50
-snapshots of a project with one 200 MB video at ~one video's cost.
+v1 keeps the existing per-project media store as-is: snapshots store the
+`SerializedProject` and reference media by asset id. Deleting a media asset
+is blocked (or the delete cascades a warning) while any version of the
+project still references it, so a restore can never hit a missing blob.
+Content-addressed blob dedup across snapshots is deferred to v2 — it is a
+media-storage rework that would collide with concurrent export/voice-over
+work for little practical gain at snapshot counts we expect.
 
 ## Storage layer
 
-New versioned migration (next schema version after current v31) adding two
-stores: `projectVersions` and `mediaBlobs`. Follow the existing per-version
-migration pattern and its 18-test fixture suite
-(`services/storage/migrations/__tests__/`). Existing per-project media
-records get re-pointed at hashed blobs by the migration.
+New versioned migration (v31→v32; v31 is current) adding one store:
+`projectVersions`. Follow the existing per-version migration pattern and its
+18-test fixture suite (`services/storage/migrations/__tests__/`).
 
 ## Surfaces (all via the actions system, per repo conventions)
 

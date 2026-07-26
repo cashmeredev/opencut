@@ -96,6 +96,10 @@ export class SaveManager {
 
 		try {
 			await this.editor.project.saveCurrentProject();
+			// Auto-checkpoint on every successful save; throttled internally.
+			this.editor.versions.writeAutoCheckpoint().catch((error) => {
+				console.error("Failed to write auto-checkpoint:", error);
+			});
 		} finally {
 			this.isSaving = false;
 			if (this.hasPendingSave) {
