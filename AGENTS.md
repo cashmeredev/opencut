@@ -135,11 +135,10 @@ Behavior details and known limitations:
 
 ### Pitfalls
 
-- `MediaPreview` (`apps/web/src/components/editor/panels/assets/views/assets.tsx`, ~line 449) renders `<Image src={item.url ?? ""}>` for image assets — any image asset without `url` crashes the panel with Next.js console errors. When creating image assets programmatically, always set both `url` (`URL.createObjectURL(file)`) and `thumbnailUrl` (`generateImageThumbnail`). The component itself still lacks a guard; fixing that is an open polish item.
+- `MediaPreview` (`apps/web/src/components/editor/panels/assets/views/assets.tsx`) renders image assets with `item.url ?? item.thumbnailUrl`, falling back to `MediaTypePlaceholder` when neither exists. Still, when creating image assets programmatically, always set both `url` (`URL.createObjectURL(file)`) and `thumbnailUrl` (`generateImageThumbnail`) — the placeholder is a degraded fallback, not a presentation anyone wants.
 - New timeline-affecting operations should go through the actions system (`definitions.ts` + `useActionHandler` in `use-editor-actions.ts`) and editor managers (`editor.timeline.*`, `editor.media.*`, `editor.renderer.*`), which wrap everything in undoable commands. MediaTime is a branded ticks type from `@/wasm` — use `mediaTimeFromSeconds`, `addMediaTime`, etc., never raw arithmetic on stored values.
 
 ### Open next steps
 
-1. ~~Commit the freeze-frame work~~ done (`fc0a801e`); ~~single-command undo~~ done (`BatchCommand` + `ShiftSplitRemainderCommand`).
-2. `MediaPreview` empty-`src` guard.
-3. Optional: freeze-duration prompt, per-clip (non-composite) capture, default keybinding.
+1. ~~Commit the freeze-frame work~~ done (`fc0a801e`); ~~single-command undo~~ done (`BatchCommand` + `ShiftSplitRemainderCommand`); ~~`MediaPreview` empty-`src` guard~~ done (thumbnail/placeholder fallback).
+2. Optional: freeze-duration prompt, per-clip (non-composite) capture, default keybinding.
