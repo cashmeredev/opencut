@@ -39,7 +39,7 @@ const getStorageLimitDescription = ({
 	})} is safely available in browser storage.`;
 };
 
-async function generateImageThumbnail({
+export async function generateImageThumbnail({
 	imageFile,
 }: {
 	imageFile: File;

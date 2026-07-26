@@ -16,7 +16,7 @@ import {
 	ZERO_MEDIA_TIME,
 } from "@/wasm";
 import { useKeyframeSelection } from "@/timeline/hooks/element/use-keyframe-selection";
-import { getElementsAtTime, hasMediaId } from "@/timeline";
+import { getElementsAtTime, hasMediaId, buildElementFromMedia } from "@/timeline";
 import { cancelInteraction } from "@/editor/cancel-interaction";
 import { invokeAction } from "@/actions";
 import { canToggleSourceAudio } from "@/timeline/audio-separation";
@@ -26,6 +26,8 @@ import {
 	type ScopeEntry,
 } from "@/selection/scope";
 import { useCommittedRef } from "@/hooks/use-committed-ref";
+import { toast } from "sonner";
+import { generateImageThumbnail } from "@/media/processing";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -367,6 +369,94 @@ export function useEditorActions() {
 			editor.timeline.toggleSourceAudioSeparation({
 				trackId: selectedElement.track.id,
 				elementId: selectedElement.element.id,
+			});
+		},
+		undefined,
+	);
+
+	useActionHandler(
+		"freeze-frame",
+		async () => {
+			const currentTime = editor.playback.getCurrentTime();
+			const tracks = editor.scenes.getActiveScene().tracks;
+			const candidates =
+				selectedElements.length > 0
+					? selectedElements
+					: getElementsAtTime({ tracks, time: currentTime });
+
+			const target = editor.timeline
+				.getElementsWithTracks({ elements: candidates })
+				.find(
+					({ element }) =>
+						element.type === "video" &&
+						currentTime > element.startTime &&
+						currentTime < element.startTime + element.duration,
+				);
+			if (!target) {
+				return;
+			}
+
+			const activeProject = editor.project.getActive();
+			if (!activeProject) {
+				return;
+			}
+
+			const blob = await editor.renderer.captureFrame();
+			if (!blob) {
+				toast.error("Failed to capture frame");
+				return;
+			}
+
+			const file = new File([blob], "freeze-frame.png", {
+				type: "image/png",
+			});
+			const { thumbnailUrl } = await generateImageThumbnail({
+				imageFile: file,
+			});
+			const asset = await editor.media.addMediaAsset({
+				projectId: activeProject.metadata.id,
+				asset: {
+					file,
+					name: "Freeze frame",
+					type: "image",
+					url: URL.createObjectURL(file),
+					thumbnailUrl,
+					width: activeProject.settings.canvasSize.width,
+					height: activeProject.settings.canvasSize.height,
+				},
+			});
+			if (!asset) {
+				return;
+			}
+
+			const freezeDuration = mediaTimeFromSeconds({ seconds: 3 });
+			const rightSideElements = editor.timeline.splitElements({
+				elements: [
+					{ trackId: target.track.id, elementId: target.element.id },
+				],
+				splitTime: currentTime,
+			});
+
+			if (rightSideElements.length > 0) {
+				editor.timeline.moveElements({
+					moves: rightSideElements.map((element) => ({
+						sourceTrackId: element.trackId,
+						targetTrackId: element.trackId,
+						elementId: element.elementId,
+						newStartTime: addMediaTime({ a: currentTime, b: freezeDuration }),
+					})),
+				});
+			}
+
+			editor.timeline.insertElement({
+				element: buildElementFromMedia({
+					mediaId: asset.id,
+					mediaType: "image",
+					name: "Freeze frame",
+					duration: freezeDuration,
+					startTime: currentTime,
+				}),
+				placement: { mode: "explicit", trackId: target.track.id },
 			});
 		},
 		undefined,

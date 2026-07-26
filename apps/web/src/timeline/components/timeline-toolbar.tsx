@@ -95,6 +95,18 @@ function ToolbarLeftSection() {
 	const isCurrentlyBookmarked = useEditor((e) =>
 		e.scenes.isBookmarked({ time: e.playback.getCurrentTime() }),
 	);
+	const canFreezeFrame = useEditor((e) => {
+		const time = e.playback.getCurrentTime();
+		const { overlay, main } = e.scenes.getActiveScene().tracks;
+		return [...overlay, main].some((track) =>
+			track.elements.some(
+				(element) =>
+					element.type === "video" &&
+					time > element.startTime &&
+					time < element.startTime + element.duration,
+			),
+		);
+	});
 	const selectedElement =
 		selectedElements.length === 1
 			? (editor.timeline.getElementsWithTracks({
@@ -185,9 +197,9 @@ function ToolbarLeftSection() {
 
 				<ToolbarButton
 					icon={<HugeiconsIcon icon={SnowIcon} />}
-					tooltip="Freeze frame (coming soon)"
-					disabled={true}
-					onClick={({ event: _event }) => {}}
+					tooltip="Freeze frame"
+					disabled={!canFreezeFrame}
+					onClick={({ event }) => handleAction({ action: "freeze-frame", event })}
 				/>
 
 				<ToolbarButton

@@ -78,18 +78,18 @@ export class RendererManager {
 		}
 	}
 
-	private async createSnapshot(): Promise<SnapshotResult> {
+	async captureFrame(): Promise<Blob | null> {
 		try {
 			const renderTree = this.getRenderTree();
 			const activeProject = this.editor.project.getActive();
 
 			if (!renderTree || !activeProject) {
-				return { success: false, error: "No project or scene to capture" };
+				return null;
 			}
 
 			const duration = this.editor.timeline.getTotalDuration();
 			if (duration === 0) {
-				return { success: false, error: "Project is empty" };
+				return null;
 			}
 
 			const { canvasSize, fps } = activeProject.settings;
@@ -114,9 +114,36 @@ export class RendererManager {
 				targetCanvas: tempCanvas,
 			});
 
-			const blob = await new Promise<Blob | null>((resolve) => {
+			return await new Promise<Blob | null>((resolve) => {
 				tempCanvas.toBlob((result) => resolve(result), "image/png");
 			});
+		} catch (error) {
+			console.error("Frame capture failed:", error);
+			return null;
+		}
+	}
+
+	private async createSnapshot(): Promise<SnapshotResult> {
+		try {
+			const renderTree = this.getRenderTree();
+			const activeProject = this.editor.project.getActive();
+
+			if (!renderTree || !activeProject) {
+				return { success: false, error: "No project or scene to capture" };
+			}
+
+			const duration = this.editor.timeline.getTotalDuration();
+			if (duration === 0) {
+				return { success: false, error: "Project is empty" };
+			}
+
+			const { fps } = activeProject.settings;
+			const renderTime = Math.min(
+				this.editor.playback.getCurrentTime(),
+				this.editor.timeline.getLastFrameTime(),
+			);
+
+			const blob = await this.captureFrame();
 
 			if (!blob) {
 				return { success: false, error: "Failed to create image" };

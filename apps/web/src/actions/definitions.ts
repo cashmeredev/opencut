@@ -102,6 +102,10 @@ export const ACTIONS = {
 		description: "Extract or recover source audio",
 		category: "editing",
 	},
+	"freeze-frame": {
+		description: "Freeze frame at playhead",
+		category: "editing",
+	},
 	"select-all": {
 		description: "Select all elements",
 		category: "selection",
