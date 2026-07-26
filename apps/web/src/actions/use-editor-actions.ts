@@ -28,6 +28,13 @@ import {
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { toast } from "sonner";
 import { generateImageThumbnail } from "@/media/processing";
+import {
+	AddMediaAssetCommand,
+	BatchCommand,
+	InsertElementCommand,
+	ShiftSplitRemainderCommand,
+	SplitElementsCommand,
+} from "@/commands";
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -413,7 +420,9 @@ export function useEditorActions() {
 			const { thumbnailUrl } = await generateImageThumbnail({
 				imageFile: file,
 			});
-			const asset = await editor.media.addMediaAsset({
+
+			const freezeDuration = mediaTimeFromSeconds({ seconds: 3 });
+			const addMediaCommand = new AddMediaAssetCommand({
 				projectId: activeProject.metadata.id,
 				asset: {
 					file,
@@ -425,38 +434,33 @@ export function useEditorActions() {
 					height: activeProject.settings.canvasSize.height,
 				},
 			});
-			if (!asset) {
-				return;
-			}
-
-			const freezeDuration = mediaTimeFromSeconds({ seconds: 3 });
-			const rightSideElements = editor.timeline.splitElements({
+			const splitCommand = new SplitElementsCommand({
 				elements: [
 					{ trackId: target.track.id, elementId: target.element.id },
 				],
 				splitTime: currentTime,
 			});
-
-			if (rightSideElements.length > 0) {
-				editor.timeline.moveElements({
-					moves: rightSideElements.map((element) => ({
-						sourceTrackId: element.trackId,
-						targetTrackId: element.trackId,
-						elementId: element.elementId,
-						newStartTime: addMediaTime({ a: currentTime, b: freezeDuration }),
-					})),
-				});
-			}
-
-			editor.timeline.insertElement({
+			const shiftCommand = new ShiftSplitRemainderCommand({
+				split: splitCommand,
+				newStartTime: addMediaTime({ a: currentTime, b: freezeDuration }),
+			});
+			const insertCommand = new InsertElementCommand({
 				element: buildElementFromMedia({
-					mediaId: asset.id,
+					mediaId: addMediaCommand.getAssetId(),
 					mediaType: "image",
 					name: "Freeze frame",
 					duration: freezeDuration,
 					startTime: currentTime,
 				}),
 				placement: { mode: "explicit", trackId: target.track.id },
+			});
+			editor.command.execute({
+				command: new BatchCommand([
+					addMediaCommand,
+					splitCommand,
+					shiftCommand,
+					insertCommand,
+				]),
 			});
 		},
 		undefined,
