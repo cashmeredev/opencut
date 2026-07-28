@@ -18,6 +18,7 @@ import {
 import type {
 	ComputeGroupResizeArgs,
 	GroupResizeMember,
+	GroupResizePushTarget,
 	GroupResizeResult,
 	GroupResizeUpdate,
 	ResizeSide,
@@ -103,14 +104,70 @@ export function computeGroupResize({
 
 	return {
 		deltaTime: Object.is(finalDeltaTime, -0) ? ZERO_MEDIA_TIME : finalDeltaTime,
-		updates: members.map((member) =>
-			buildResizeUpdate({
-				member,
-				side,
-				deltaTime: finalDeltaTime,
-			}),
-		),
+		updates: [
+			...members.map((member) =>
+				buildResizeUpdate({
+					member,
+					side,
+					deltaTime: finalDeltaTime,
+				}),
+			),
+			...buildRipplePushUpdates({ members, side, deltaTime: finalDeltaTime }),
+		],
 	};
+}
+
+function buildRipplePushUpdates({
+	members,
+	side,
+	deltaTime,
+}: {
+	members: GroupResizeMember[];
+	side: ResizeSide;
+	deltaTime: MediaTime;
+}): GroupResizeUpdate[] {
+	if (side !== "right" || deltaTime <= 0) {
+		return [];
+	}
+
+	const overflowByTarget = new Map<
+		string,
+		{ target: GroupResizePushTarget; overflow: MediaTime }
+	>();
+	for (const member of members) {
+		if (
+			member.sourceDuration != null ||
+			member.rightPushChain === undefined ||
+			member.rightNeighborBound === null
+		) {
+			continue;
+		}
+		const neighborCeiling = subMediaTime({
+			a: member.rightNeighborBound,
+			b: addMediaTime({ a: member.startTime, b: member.duration }),
+		});
+		const overflow = subMediaTime({ a: deltaTime, b: neighborCeiling });
+		if (overflow <= 0) {
+			continue;
+		}
+		for (const target of member.rightPushChain) {
+			const existing = overflowByTarget.get(target.elementId);
+			if (existing === undefined || overflow > existing.overflow) {
+				overflowByTarget.set(target.elementId, { target, overflow });
+			}
+		}
+	}
+
+	return [...overflowByTarget.values()].map(({ target, overflow }) => ({
+		trackId: target.trackId,
+		elementId: target.elementId,
+		patch: {
+			trimStart: target.trimStart,
+			trimEnd: target.trimEnd,
+			startTime: addMediaTime({ a: target.startTime, b: overflow }),
+			duration: target.duration,
+		},
+	}));
 }
 
 function buildResizeUpdate({
@@ -219,7 +276,7 @@ function getMaximumAllowedDeltaTime({
 					b: addMediaTime({ a: member.startTime, b: member.duration }),
 				});
 	if (member.sourceDuration == null) {
-		return rightNeighborCeiling;
+		return member.rightPushChain === undefined ? rightNeighborCeiling : null;
 	}
 
 	const maximumVisibleSourceSpan = subMediaTime({

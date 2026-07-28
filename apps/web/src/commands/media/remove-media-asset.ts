@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { MediaAsset } from "@/media/types";
 import { buildWaveformSourceKey } from "@/media/waveform-summary";
 import { storageService } from "@/services/storage/service";
+import { thumbnailCache } from "@/services/thumbnail-cache/service";
 import { videoCache } from "@/services/video-cache/service";
 import { waveformCache } from "@/services/waveform-cache/service";
 import { hasMediaId } from "@/timeline/element-utils";
@@ -67,6 +68,7 @@ export class RemoveMediaAssetCommand extends Command {
 		}
 
 		videoCache.clearVideo({ mediaId: this.assetId });
+		thumbnailCache.clearMedia({ mediaId: this.assetId });
 		waveformCache.clearSource({
 			sourceKey: buildWaveformSourceKey({
 				kind: "media",

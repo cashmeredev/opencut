@@ -132,7 +132,7 @@ Files:
 
 Behavior details and known limitations:
 
-- Freeze duration comes from the prompt store (`actions/freeze-frame-store.ts`), default/last-used prefilled.
+- Freeze duration is a fixed 3 seconds (`FREEZE_DURATION_SECONDS` in `use-editor-actions.ts`); there is no duration prompt.
 - The still is a composite capture of the whole canvas at the current time — overlays, text, and stickers visible at that moment are baked in. CapCut freezes only the clip itself; per-clip capture would need a single-element render pass.
 - Target is the first selected video element under the playhead (or the first video element under the playhead if nothing is selected). With stacked videos on several tracks it may pick a non-topmost one.
 - One freeze is a single undo step: the handler builds one `BatchCommand` (`AddMediaAssetCommand` + `SplitElementsCommand` + `ShiftSplitRemainderCommand` + `InsertElementCommand`) and executes it once via `editor.command.execute`.

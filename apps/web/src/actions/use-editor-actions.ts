@@ -28,7 +28,6 @@ import {
 import { useCommittedRef } from "@/hooks/use-committed-ref";
 import { toast } from "sonner";
 import { generateImageThumbnail } from "@/media/processing";
-import { useFreezeFrameStore } from "@/actions/freeze-frame-store";
 import {
 	AddMediaAssetCommand,
 	BatchCommand,
@@ -46,6 +45,8 @@ import {
 } from "@/voiceover/recorder";
 import type { VoiceOverRecordingResult } from "@/voiceover/recorder";
 import { useVoiceOverStore } from "@/voiceover/voiceover-store";
+
+const FREEZE_DURATION_SECONDS = 3;
 
 export function useEditorActions() {
 	const editor = useEditor();
@@ -421,13 +422,6 @@ export function useEditorActions() {
 				return;
 			}
 
-			const freezeDurationSeconds = await useFreezeFrameStore
-				.getState()
-				.requestDuration();
-			if (freezeDurationSeconds === null) {
-				return;
-			}
-
 			const blob = await editor.renderer.captureFrame();
 			if (!blob) {
 				toast.error("Failed to capture frame");
@@ -442,7 +436,7 @@ export function useEditorActions() {
 			});
 
 			const freezeDuration = mediaTimeFromSeconds({
-				seconds: freezeDurationSeconds,
+				seconds: FREEZE_DURATION_SECONDS,
 			});
 			const addMediaCommand = new AddMediaAssetCommand({
 				projectId: activeProject.metadata.id,

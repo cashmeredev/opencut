@@ -4,6 +4,13 @@ import type { MediaTime } from "@/wasm";
 
 export type ResizeSide = "left" | "right";
 
+export interface GroupResizePushTarget extends ElementRef {
+	startTime: MediaTime;
+	duration: MediaTime;
+	trimStart: MediaTime;
+	trimEnd: MediaTime;
+}
+
 export interface GroupResizeMember extends ElementRef {
 	startTime: MediaTime;
 	duration: MediaTime;
@@ -13,6 +20,7 @@ export interface GroupResizeMember extends ElementRef {
 	retime?: RetimeConfig;
 	leftNeighborBound: MediaTime | null;
 	rightNeighborBound: MediaTime | null;
+	rightPushChain?: GroupResizePushTarget[];
 }
 
 export interface GroupResizeUpdate extends ElementRef {

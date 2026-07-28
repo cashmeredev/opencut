@@ -6,7 +6,6 @@ import { SceneExporter } from "@/services/renderer/scene-exporter";
 import { buildScene } from "@/services/renderer/scene-builder";
 import { createTimelineAudioBuffer } from "@/media/audio";
 import { formatTimecode } from "opencut-wasm";
-import { frameRateToFloat } from "@/fps/utils";
 import { downloadBlob } from "@/utils/browser";
 
 type SnapshotResult =
@@ -192,6 +191,10 @@ export class RendererManager {
 
 			const exportFps = fps ?? activeProject.settings.fps;
 			const canvasSize = activeProject.settings.canvasSize;
+			const exportSize = {
+				width: 2 * Math.round(canvasSize.width / 2),
+				height: 2 * Math.round(canvasSize.height / 2),
+			};
 
 			let audioBuffer: AudioBuffer | null = null;
 			if (includeAudio) {
@@ -207,13 +210,13 @@ export class RendererManager {
 				tracks,
 				mediaAssets,
 				duration,
-				canvasSize,
+				canvasSize: exportSize,
 				background: activeProject.settings.background,
 			});
 
 			const exporter = new SceneExporter({
-				width: canvasSize.width,
-				height: canvasSize.height,
+				width: exportSize.width,
+				height: exportSize.height,
 				fps: exportFps,
 				format,
 				quality,

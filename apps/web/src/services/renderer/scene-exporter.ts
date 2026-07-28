@@ -19,6 +19,7 @@ import { frameRateToFloat } from "@/fps/utils";
 import type { RootNode } from "./nodes/root-node";
 import type { ExportFormat, ExportQuality } from "@/export";
 import { CanvasRenderer } from "./canvas-renderer";
+import { computeVideoBitrate } from "./export-encoding";
 
 type ExportParams = {
 	width: number;
@@ -30,12 +31,14 @@ type ExportParams = {
 	audioBuffer?: AudioBuffer;
 };
 
-const qualityMap = {
+const audioQualityMap = {
 	low: QUALITY_LOW,
 	medium: QUALITY_MEDIUM,
 	high: QUALITY_HIGH,
 	very_high: QUALITY_VERY_HIGH,
 };
+
+const KEY_FRAME_INTERVAL_SECONDS = 2;
 
 export type SceneExporterEvents = {
 	progress: [progress: number];
@@ -99,9 +102,17 @@ export class SceneExporter extends EventEmitter<SceneExporterEvents> {
 			target: new BufferTarget(),
 		});
 
+		const videoBitrate = computeVideoBitrate({
+			width: this.renderer.width,
+			height: this.renderer.height,
+			fps: fpsFloat,
+			quality: this.quality,
+		});
+
 		const videoSource = new CanvasSource(this.renderer.getOutputCanvas(), {
 			codec: this.format === "webm" ? "vp9" : "avc",
-			bitrate: qualityMap[this.quality],
+			bitrate: videoBitrate,
+			keyFrameInterval: KEY_FRAME_INTERVAL_SECONDS,
 		});
 
 		output.addVideoTrack(videoSource, { frameRate: fpsFloat });
@@ -122,7 +133,7 @@ export class SceneExporter extends EventEmitter<SceneExporterEvents> {
 
 			audioSource = new AudioBufferSource({
 				codec: audioCodec,
-				bitrate: qualityMap[this.quality],
+				bitrate: audioQualityMap[this.quality],
 			});
 			output.addAudioTrack(audioSource);
 		}

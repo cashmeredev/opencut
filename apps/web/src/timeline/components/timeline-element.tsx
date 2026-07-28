@@ -5,6 +5,8 @@ import { useEditor } from "@/editor/use-editor";
 import { FEATURES } from "@/features";
 import { useAssetsPanelStore } from "@/components/editor/panels/assets/assets-panel-store";
 import { AudioWaveform, WAVEFORM_GAIN_SAMPLE_COUNT } from "./audio-waveform";
+import { VideoFilmstrip } from "./video-filmstrip";
+import { MEDIA_TILE_ASPECT_RATIO } from "@/services/thumbnail-cache/tiling";
 import { AudioVolumeLine } from "./audio-volume-line";
 import { useElementPreview } from "@/timeline/hooks/use-element-preview";
 import {
@@ -95,7 +97,6 @@ const KEYFRAME_INDICATOR_MIN_WIDTH_PX = 40;
 const ELEMENT_RING_WIDTH_PX = 1.5;
 
 const PixelsPerSecondContext = createContext<number | null>(null);
-const THUMBNAIL_ASPECT_RATIO = 16 / 9;
 
 interface KeyframeIndicator {
 	time: MediaTime;
@@ -1082,20 +1083,78 @@ function EffectsButton({
 	);
 }
 
-function TiledMediaContent({
+function VideoElementContent({
 	element,
 	track,
 }: {
-	element: VideoElement | ImageElement;
+	element: VideoElement;
+	track: TimelineTrack;
+}) {
+	const pixelsPerSecond = useContext(PixelsPerSecondContext);
+	if (pixelsPerSecond === null) {
+		throw new Error(
+			"VideoElementContent must be rendered inside PixelsPerSecondContext.Provider",
+		);
+	}
+	const mediaAssets = useEditor((e) => e.media.getAssets());
+	const mediaAsset = mediaAssets.find((asset) => asset.id === element.mediaId);
+
+	if (!mediaAsset) {
+		return (
+			<span className="text-foreground/80 truncate text-xs">
+				{element.name}
+			</span>
+		);
+	}
+
+	const trackHeight = getTrackHeight({ type: track.type });
+	const fallbackTileWidth = trackHeight * MEDIA_TILE_ASPECT_RATIO;
+
+	return (
+		<>
+			{mediaAsset.thumbnailUrl && (
+				<div
+					className="absolute inset-0"
+					style={{
+						backgroundColor: "var(--muted)",
+						backgroundImage: `url(${mediaAsset.thumbnailUrl})`,
+						backgroundRepeat: "repeat-x",
+						backgroundSize: `${fallbackTileWidth}px ${trackHeight}px`,
+						backgroundPosition: "left center",
+						pointerEvents: "none",
+					}}
+				/>
+			)}
+			<VideoFilmstrip
+				element={element}
+				mediaAsset={mediaAsset}
+				pixelsPerSecond={pixelsPerSecond}
+				trackHeight={trackHeight}
+			/>
+			<MediaElementHeader
+				name={mediaAsset.name}
+				leading={
+					FEATURES.effects && hasElementEffects({ element }) ? (
+						<EffectsButton element={element} track={track} />
+					) : null
+				}
+				hasFade={true}
+			/>
+		</>
+	);
+}
+
+function ImageElementContent({
+	element,
+	track,
+}: {
+	element: ImageElement;
 	track: TimelineTrack;
 }) {
 	const mediaAssets = useEditor((e) => e.media.getAssets());
 
 	const mediaAsset = mediaAssets.find((asset) => asset.id === element.mediaId);
-	const imageUrl =
-		element.type === "video"
-			? mediaAsset?.thumbnailUrl
-			: (mediaAsset?.thumbnailUrl ?? mediaAsset?.url);
+	const imageUrl = mediaAsset?.thumbnailUrl ?? mediaAsset?.url;
 
 	if (!imageUrl) {
 		return (
@@ -1106,7 +1165,7 @@ function TiledMediaContent({
 	}
 
 	const trackHeight = getTrackHeight({ type: track.type });
-	const tileWidth = trackHeight * THUMBNAIL_ASPECT_RATIO;
+	const tileWidth = trackHeight * MEDIA_TILE_ASPECT_RATIO;
 
 	return (
 		<>
@@ -1177,8 +1236,9 @@ function ElementContent({ element, track }: ElementContentProps) {
 		case "audio":
 			return <AudioElementContent element={element} trackId={track.id} />;
 		case "video":
+			return <VideoElementContent element={element} track={track} />;
 		case "image":
-			return <TiledMediaContent element={element} track={track} />;
+			return <ImageElementContent element={element} track={track} />;
 	}
 }
 
