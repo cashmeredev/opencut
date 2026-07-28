@@ -317,6 +317,68 @@ impl GpuContext {
         })
     }
 
+    pub async fn read_texture(
+        &self,
+        texture: &wgpu::Texture,
+    ) -> Result<Vec<u8>, GpuError> {
+        let size = texture.size();
+        let unpadded_bytes_per_row = size.width * 4;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row = unpadded_bytes_per_row.div_ceil(align) * align;
+        let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gpu-readback-buffer"),
+            size: (padded_bytes_per_row * size.height) as u64,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("gpu-readback-encoder"),
+            });
+        encoder.copy_texture_to_buffer(
+            texture.as_image_copy(),
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(padded_bytes_per_row),
+                    rows_per_image: Some(size.height),
+                },
+            },
+            size,
+        );
+        self.queue.submit([encoder.finish()]);
+
+        let slice = buffer.slice(..);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = sender.send(result);
+        });
+        self.device
+            .poll(wgpu::PollType::wait_indefinitely())
+            .map_err(|error| GpuError::Readback(error.to_string()))?;
+        receiver
+            .recv()
+            .map_err(|error| GpuError::Readback(error.to_string()))?
+            .map_err(|error| GpuError::Readback(error.to_string()))?;
+
+        let padded = slice.get_mapped_range();
+        let mut pixels =
+            vec![0u8; (unpadded_bytes_per_row * size.height) as usize];
+        for row in 0..size.height as usize {
+            let padded_start = row * padded_bytes_per_row as usize;
+            let unpadded_start = row * unpadded_bytes_per_row as usize;
+            pixels[unpadded_start..unpadded_start + unpadded_bytes_per_row as usize]
+                .copy_from_slice(
+                    &padded[padded_start..padded_start + unpadded_bytes_per_row as usize],
+                );
+        }
+        drop(padded);
+        buffer.unmap();
+        Ok(pixels)
+    }
+
     pub fn instance(&self) -> &wgpu::Instance {
         &self.instance
     }

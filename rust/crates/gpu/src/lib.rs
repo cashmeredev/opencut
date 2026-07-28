@@ -18,4 +18,6 @@ pub enum GpuError {
     CreateSurface(#[from] wgpu::CreateSurfaceError),
     #[error("The output surface does not support the required texture format")]
     UnsupportedSurfaceFormat,
+    #[error("Failed to read back a texture: {0}")]
+    Readback(String),
 }

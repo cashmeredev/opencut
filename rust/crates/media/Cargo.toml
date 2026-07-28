@@ -1,0 +1,9 @@
+[package]
+name = "media"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ffmpeg-next = "8"
+thiserror = "2"
+time = { version = "0.1.0", path = "../time" }

@@ -1,0 +1,8 @@
+[package]
+name = "mask-defs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+scene = { version = "0.1.0", path = "../scene" }
+thiserror = "2"

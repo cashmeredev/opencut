@@ -1,0 +1,9 @@
+[package]
+name = "effect-defs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+scene = { version = "0.1.0", path = "../scene" }
+effects = { version = "0.1.0", path = "../effects" }
+thiserror = "2"
