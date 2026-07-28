@@ -19,5 +19,7 @@ members = [
     "rust/crates/effect-defs",
     "rust/crates/mask-defs",
     "rust/crates/playback",
+    "rust/crates/renderer",
+    "rust/crates/audio",
     "rust/wasm", "rust/crates/compositor",
 ]

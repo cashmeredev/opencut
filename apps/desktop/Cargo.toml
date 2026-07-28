@@ -9,3 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 gpui = "0.2.2"
+scene = { version = "0.1.0", path = "../../rust/crates/scene" }
+storage = { version = "0.1.0", path = "../../rust/crates/storage" }
+time = { version = "0.1.0", path = "../../rust/crates/time" }
+chrono = "0.4"

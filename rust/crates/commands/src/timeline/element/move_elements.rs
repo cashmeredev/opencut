@@ -40,8 +40,16 @@ fn insert_track_at_display_index(
 }
 
 fn validate_compatibility(element: &Element, track: &Track) -> Result<(), CommandError> {
-    timeline::placement::validate_element_track_compatibility(element, track)
-        .map_err(CommandError::IncompatiblePlacement)
+    let compatibility = timeline::placement::validate_element_track_compatibility(
+        timeline::ElementType::of_element(element),
+        timeline::TrackType::of_track(track),
+    );
+    if compatibility.is_valid {
+        return Ok(());
+    }
+    Err(CommandError::IncompatiblePlacement(
+        compatibility.error_message.unwrap_or_default(),
+    ))
 }
 
 pub struct MoveElementCommand {
@@ -75,7 +83,7 @@ impl Command for MoveElementCommand {
         let mut create_tracks = self.create_tracks.clone();
         create_tracks.sort_by_key(|creation| creation.index);
         for creation in &create_tracks {
-            let track = build_empty_track(&creation.id, creation.track_type, None);
+            let track = build_empty_track(creation.id.clone(), creation.track_type, None);
             insert_track_at_display_index(&mut scene.tracks, track, creation.index);
         }
 

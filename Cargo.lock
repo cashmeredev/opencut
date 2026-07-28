@@ -450,6 +450,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "audio"
+version = "0.1.0"
+dependencies = [
+ "animation",
+ "media",
+ "scene",
+ "thiserror 2.0.18",
+ "time",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2607,6 +2618,8 @@ name = "graphics"
 version = "0.1.0"
 dependencies = [
  "scene",
+ "thiserror 2.0.18",
+ "tiny-skia",
 ]
 
 [[package]]
@@ -3443,8 +3456,10 @@ dependencies = [
 name = "mask-defs"
 version = "0.1.0"
 dependencies = [
+ "cosmic-text 0.15.0",
  "scene",
  "thiserror 2.0.18",
+ "tiny-skia",
 ]
 
 [[package]]
@@ -4020,7 +4035,11 @@ dependencies = [
 name = "opencut-desktop"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "gpui",
+ "scene",
+ "storage",
+ "time",
 ]
 
 [[package]]
@@ -4806,6 +4825,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
+name = "renderer"
+version = "0.1.0"
+dependencies = [
+ "compositor",
+ "scene",
+ "serde",
+ "serde_json",
+ "time",
+]
+
+[[package]]
 name = "resvg"
 version = "0.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5050,6 +5080,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "uuid",
 ]
 
 [[package]]

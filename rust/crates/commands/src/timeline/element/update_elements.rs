@@ -1,11 +1,11 @@
-use scene::{ElementRef, Project, SceneTracks};
+use scene::{Project, SceneTracks};
 use timeline::update_pipeline::{ElementPatch, ElementUpdateContext, apply_element_update};
 
 use crate::command::{Command, CommandError, CommandResult};
 use crate::project_ext::active_scene_mut;
 use crate::tracks::find_track_mut;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ElementUpdate {
     pub track_id: String,
     pub element_id: String,
@@ -54,8 +54,7 @@ impl Command for UpdateElementsCommand {
                 continue;
             };
 
-            let current = element.clone();
-            *element = apply_element_update(current, update.patch.clone(), &context);
+            *element = apply_element_update(element, &update.patch, &context);
         }
 
         Ok(None)

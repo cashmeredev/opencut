@@ -11,16 +11,19 @@ pub struct PassContext<'a> {
     pub height: u32,
 }
 
+#[derive(Debug)]
 pub struct EffectPassTemplate {
     pub shader: &'static str,
     pub uniforms: fn(&PassContext) -> HashMap<String, UniformValue>,
 }
 
+#[derive(Debug)]
 pub struct EffectRendererConfig {
     pub passes: Vec<EffectPassTemplate>,
     pub build_passes: Option<fn(&PassContext) -> Vec<EffectPass>>,
 }
 
+#[derive(Debug)]
 pub struct EffectDefinition {
     pub effect_type: &'static str,
     pub name: &'static str,

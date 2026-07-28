@@ -1,6 +1,7 @@
 pub mod animation;
 pub mod effect;
 pub mod element;
+pub mod factory;
 pub mod iso_date;
 pub mod mask;
 pub mod params;
@@ -11,6 +12,7 @@ pub mod track;
 pub use animation::*;
 pub use effect::*;
 pub use element::*;
+pub use factory::*;
 pub use mask::*;
 pub use params::*;
 pub use project::*;

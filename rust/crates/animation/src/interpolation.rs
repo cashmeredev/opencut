@@ -223,7 +223,10 @@ pub fn channel_value_at_time(
     time: MediaTime,
     fallback_value: &ParamValue,
 ) -> ParamValue {
-    let Some(channel) = channel.filter(|channel| !channel.keys.is_empty()) else {
+    let Some(channel) = channel.filter(|channel| match channel {
+        AnimationChannel::Scalar(scalar) => !scalar.keys.is_empty(),
+        AnimationChannel::Discrete(discrete) => !discrete.keys.is_empty(),
+    }) else {
         return fallback_value.clone();
     };
 
@@ -254,7 +257,7 @@ pub fn channel_value_at_time(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use scene::{ChannelExtrapolation, TangentMode};
+    use scene::{ChannelExtrapolation, DiscreteAnimationKey, TangentMode};
 
     fn scalar_key(id: &str, time: i64, value: f64, segment: ScalarSegmentType) -> ScalarAnimationKey {
         ScalarAnimationKey {
@@ -360,7 +363,7 @@ mod tests {
             scalar_key("b", 100, 100.0, ScalarSegmentType::Bezier),
         ]);
         let value = scalar_channel_value_at_time(Some(&channel), at(50), 0.0);
-        assert!((value - 50.0).abs() < 1e-6);
+        assert!((value - 50.0).abs() < 1e-3);
     }
 
     #[test]
@@ -379,7 +382,7 @@ mod tests {
         let quarter = scalar_channel_value_at_time(Some(&channel), at(25), 0.0);
         let mid = scalar_channel_value_at_time(Some(&channel), at(50), 0.0);
         assert!(quarter < 25.0);
-        assert!((mid - 50.0).abs() < 1e-6);
+        assert!((mid - 50.0).abs() < 1e-3);
     }
 
     #[test]

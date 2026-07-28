@@ -14,8 +14,8 @@ use crate::channel_data::{
 use crate::channel_layout::{ChannelLayout, ChannelValueKind};
 use crate::id::generate_uuid;
 use crate::interpolation::{
-    channel_value_at_time, is_scalar_channel, normalize_channel, normalize_discrete_channel,
-    normalize_scalar_channel, scalar_segment_interpolation,
+    normalize_channel, normalize_discrete_channel, normalize_scalar_channel,
+    scalar_segment_interpolation,
 };
 use crate::types::{AnimationInterpolation, ScalarCurveKeyframePatch};
 
@@ -23,21 +23,15 @@ fn round_media_time(time: f64) -> MediaTime {
     MediaTime::from_ticks(time.round() as i64)
 }
 
-fn has_channel_keys(channel: Option<&AnimationChannel>) -> bool {
-    channel.is_some_and(|channel| !channel.keys().is_empty())
-}
-
-trait ChannelKeys {
-    fn keys(&self) -> usize;
-}
-
-impl ChannelKeys for AnimationChannel {
-    fn keys(&self) -> usize {
-        match self {
-            AnimationChannel::Scalar(scalar) => scalar.keys.len(),
-            AnimationChannel::Discrete(discrete) => discrete.keys.len(),
-        }
+fn channel_key_count(channel: &AnimationChannel) -> usize {
+    match channel {
+        AnimationChannel::Scalar(scalar) => scalar.keys.len(),
+        AnimationChannel::Discrete(discrete) => discrete.keys.len(),
     }
+}
+
+fn has_channel_keys(channel: Option<&AnimationChannel>) -> bool {
+    channel.is_some_and(|channel| channel_key_count(channel) > 0)
 }
 
 fn has_channel_data(data: Option<&ChannelData>) -> bool {
@@ -296,7 +290,7 @@ pub fn get_channel<'a>(
     animations: Option<&'a ElementAnimations>,
     property_path: &str,
 ) -> Option<&'a AnimationChannel> {
-    let data = animations?.get(property_path);
+    let data = animations?.get(property_path)?;
     match data {
         ChannelData::Single(channel) => Some(channel),
         ChannelData::Composite(_) => get_channels_from_data(Some(data)).into_iter().next(),
@@ -313,13 +307,18 @@ pub fn upsert_path_keyframe(
     channel_layout: &ChannelLayout,
     coerce_value: impl Fn(&ParamValue) -> Option<ParamValue>,
 ) -> Option<ElementAnimations> {
-    let coerced_value = coerce_value(value)?;
+    let coerced_value = match coerce_value(value) {
+        Some(coerced_value) => coerced_value,
+        None => return animations.cloned(),
+    };
 
     let mut next_animations = animations.cloned().unwrap_or_default();
     let current_data = animations.and_then(|a| a.get(property_path)).cloned();
     let primary_channel = get_primary_channel_from_data(current_data.as_ref(), channel_layout);
     let (target_id, target_time) = get_target_key_metadata(primary_channel, time, keyframe_id);
-    let component_values = channel_layout.decompose(&coerced_value)?;
+    let Some(component_values) = channel_layout.decompose(&coerced_value) else {
+        return animations.cloned();
+    };
 
     let mut next_data = current_data.clone();
     for component in channel_layout.components() {
@@ -731,8 +730,8 @@ fn split_discrete_channel_at_time(
     if include_split_boundary {
         let has_boundary_on_left = left_keys.iter().any(|key| key.time == split_time);
         let has_boundary_on_right = right_keys.iter().any(|key| key.time == MediaTime::ZERO);
-        let boundary_value = discrete_value_at_time(
-            &normalized,
+        let boundary_value = crate::interpolation::discrete_channel_value_at_time(
+            Some(&normalized),
             split_time,
             normalized.keys[0].value.clone(),
         );
@@ -771,17 +770,6 @@ fn split_discrete_channel_at_time(
             )))
         },
     }
-}
-
-fn discrete_value_at_time(
-    channel: &DiscreteChannel,
-    time: MediaTime,
-    fallback_value: DiscreteValue,
-) -> DiscreteValue {
-    let ParamValue::Bool(_) = ParamValue::Bool(false) else {
-        unreachable!()
-    };
-    crate::interpolation::discrete_channel_value_at_time(Some(channel), time, fallback_value)
 }
 
 fn build_split_scalar_result(
@@ -1087,11 +1075,15 @@ pub fn remove_element_keyframe(
     property_path: &str,
     keyframe_id: &str,
 ) -> Option<ElementAnimations> {
-    let data = animations.and_then(|a| a.get(property_path))?;
+    let Some(data) = animations.and_then(|a| a.get(property_path)) else {
+        return animations.cloned();
+    };
 
     let mut next_animations = animations.cloned().unwrap_or_default();
     let next_data = match data {
-        ChannelData::Single(channel) => remove_keyframe(Some(channel), keyframe_id),
+        ChannelData::Single(channel) => {
+            remove_keyframe(Some(channel), keyframe_id).map(ChannelData::Single)
+        }
         ChannelData::Composite(components) => {
             let mut next_data = Some(data.clone());
             for (component_key, channel) in components {
@@ -1121,11 +1113,15 @@ pub fn retime_element_keyframe(
     keyframe_id: &str,
     time: MediaTime,
 ) -> Option<ElementAnimations> {
-    let data = animations.and_then(|a| a.get(property_path))?;
+    let Some(data) = animations.and_then(|a| a.get(property_path)) else {
+        return animations.cloned();
+    };
 
     let mut next_animations = animations.cloned().unwrap_or_default();
     let next_data = match data {
-        ChannelData::Single(channel) => retime_keyframe(Some(channel), keyframe_id, time),
+        ChannelData::Single(channel) => {
+            retime_keyframe(Some(channel), keyframe_id, time).map(ChannelData::Single)
+        }
         ChannelData::Composite(components) => {
             let mut next_data = Some(data.clone());
             for (component_key, channel) in components {
@@ -1147,4 +1143,301 @@ pub fn retime_element_keyframe(
         }
     }
     to_animation(next_animations)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel_layout::number_channel_layout;
+    use scene::CurveHandle;
+
+    fn at(time: i64) -> MediaTime {
+        MediaTime::from_ticks(time)
+    }
+
+    fn scalar_key(id: &str, time: i64, value: f64) -> ScalarAnimationKey {
+        ScalarAnimationKey {
+            id: id.to_string(),
+            time: at(time),
+            value,
+            left_handle: None,
+            right_handle: None,
+            segment_to_next: ScalarSegmentType::Linear,
+            tangent_mode: TangentMode::Flat,
+        }
+    }
+
+    fn bezier_ease_key(id: &str, time: i64, value: f64, right: bool) -> ScalarAnimationKey {
+        let mut key = scalar_key(id, time, value);
+        key.segment_to_next = ScalarSegmentType::Bezier;
+        if right {
+            key.right_handle = Some(CurveHandle { dt: at(50), dv: 0.0 });
+        } else {
+            key.left_handle = Some(CurveHandle { dt: at(-50), dv: 0.0 });
+        }
+        key
+    }
+
+    fn scalar_channel(keys: Vec<ScalarAnimationKey>) -> ScalarChannel {
+        ScalarChannel { keys, extrapolation: None }
+    }
+
+    fn animations_with(path: &str, data: ChannelData) -> ElementAnimations {
+        let mut animations = ElementAnimations::new();
+        animations.insert(path.to_string(), data);
+        animations
+    }
+
+    #[test]
+    fn upsert_scalar_key_inserts_sorted() {
+        let channel = upsert_scalar_channel_key(None, at(100), 1.0, None, None, Some("b"));
+        let channel = upsert_scalar_channel_key(Some(&channel), at(0), 0.0, None, None, Some("a"));
+        assert_eq!(channel.keys.len(), 2);
+        assert_eq!(channel.keys[0].id, "a");
+        assert_eq!(channel.keys[1].id, "b");
+    }
+
+    #[test]
+    fn upsert_scalar_key_replaces_value_at_same_time_keeping_id() {
+        let channel = upsert_scalar_channel_key(None, at(50), 1.0, None, None, Some("a"));
+        let channel = upsert_scalar_channel_key(Some(&channel), at(50), 2.0, None, None, None);
+        assert_eq!(channel.keys.len(), 1);
+        assert_eq!(channel.keys[0].id, "a");
+        assert_eq!(channel.keys[0].value, 2.0);
+    }
+
+    #[test]
+    fn upsert_scalar_key_by_id_moves_time_and_preserves_segment() {
+        let channel = upsert_scalar_channel_key(
+            None, at(0), 0.0, Some(AnimationInterpolation::Bezier), None, Some("a"),
+        );
+        assert_eq!(channel.keys[0].segment_to_next, ScalarSegmentType::Bezier);
+        let channel = upsert_scalar_channel_key(Some(&channel), at(80), 5.0, None, None, Some("a"));
+        assert_eq!(channel.keys[0].time, at(80));
+        assert_eq!(channel.keys[0].segment_to_next, ScalarSegmentType::Bezier);
+    }
+
+    #[test]
+    fn new_key_defaults_to_component_interpolation() {
+        let channel = upsert_scalar_channel_key(
+            None, at(0), 0.0, None, Some(AnimationInterpolation::Hold), Some("a"),
+        );
+        assert_eq!(channel.keys[0].segment_to_next, ScalarSegmentType::Step);
+    }
+
+    #[test]
+    fn remove_keyframe_returns_none_when_empty() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![scalar_key("a", 0, 1.0)]));
+        assert!(remove_keyframe(Some(&channel), "a").is_none());
+        let kept = remove_keyframe(Some(&channel), "missing").unwrap();
+        assert_eq!(channel_key_count(&kept), 1);
+    }
+
+    #[test]
+    fn retime_keyframe_resorts_channel() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 1.0),
+        ]));
+        let retimed = retime_keyframe(Some(&channel), "a", at(200)).unwrap();
+        let AnimationChannel::Scalar(scalar) = retimed else { panic!("expected scalar") };
+        assert_eq!(scalar.keys[0].id, "b");
+        assert_eq!(scalar.keys[1].id, "a");
+        assert_eq!(scalar.keys[1].time, at(200));
+    }
+
+    #[test]
+    fn upsert_path_keyframe_creates_leaf_channel() {
+        let result = upsert_path_keyframe(
+            None, "opacity", at(0), &ParamValue::Number(0.5), None, Some("k1"),
+            &number_channel_layout(), |value| Some(value.clone()),
+        )
+        .unwrap();
+        let channel = get_channel(Some(&result), "opacity").unwrap();
+        assert_eq!(channel_key_count(channel), 1);
+    }
+
+    #[test]
+    fn upsert_path_keyframe_rejects_uncoercible_values() {
+        let result = upsert_path_keyframe(
+            None, "opacity", at(0), &ParamValue::Number(f64::NAN), None, None,
+            &number_channel_layout(), |_| None,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn upsert_path_keyframe_decomposes_color_into_components() {
+        let result = upsert_path_keyframe(
+            None, "color", at(0), &ParamValue::String("#ff0000".to_string()), None, Some("k1"),
+            &crate::channel_layout::color_channel_layout(), |value| Some(value.clone()),
+        )
+        .unwrap();
+        let Some(ChannelData::Composite(components)) = result.get("color") else {
+            panic!("expected composite data")
+        };
+        assert_eq!(components.len(), 4);
+        for component_key in ["r", "g", "b", "a"] {
+            assert_eq!(channel_key_count(components.get(component_key).unwrap()), 1);
+        }
+    }
+
+    #[test]
+    fn split_linear_channel_inserts_boundary_keys() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 10.0),
+        ]));
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let (left, right) = split_animations_at_time_with_options(Some(&animations), at(50), true);
+
+        let left_channel = get_channel(left.as_ref(), "opacity").unwrap();
+        let AnimationChannel::Scalar(left_scalar) = left_channel else { panic!("expected scalar") };
+        assert_eq!(left_scalar.keys.len(), 2);
+        assert_eq!(left_scalar.keys[1].time, at(50));
+        assert_eq!(left_scalar.keys[1].value, 5.0);
+
+        let right_channel = get_channel(right.as_ref(), "opacity").unwrap();
+        let AnimationChannel::Scalar(right_scalar) = right_channel else { panic!("expected scalar") };
+        assert_eq!(right_scalar.keys.len(), 2);
+        assert_eq!(right_scalar.keys[0].time, at(0));
+        assert_eq!(right_scalar.keys[0].value, 5.0);
+        assert_eq!(right_scalar.keys[1].time, at(50));
+        assert_eq!(right_scalar.keys[1].value, 10.0);
+    }
+
+    #[test]
+    fn split_bezier_channel_preserves_curve_value_at_boundary() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            bezier_ease_key("a", 0, 0.0, true),
+            bezier_ease_key("b", 100, 100.0, false),
+        ]));
+        let ParamValue::Number(sampled) = crate::interpolation::channel_value_at_time(
+            Some(&channel), at(50), &ParamValue::Number(0.0),
+        ) else {
+            panic!("expected number")
+        };
+
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let (left, right) = split_animations_at_time_with_options(Some(&animations), at(50), true);
+        let left_channel = get_channel(left.as_ref(), "opacity").unwrap();
+        let AnimationChannel::Scalar(left_scalar) = left_channel else { panic!("expected scalar") };
+        let boundary = left_scalar.keys.last().unwrap();
+        assert_eq!(boundary.time, at(50));
+        assert!((boundary.value - sampled).abs() < 1e-9);
+
+        let right_channel = get_channel(right.as_ref(), "opacity").unwrap();
+        let AnimationChannel::Scalar(right_scalar) = right_channel else { panic!("expected scalar") };
+        assert_eq!(right_scalar.keys[0].time, at(0));
+        assert!((right_scalar.keys[0].value - sampled).abs() < 1e-9);
+    }
+
+    #[test]
+    fn split_without_boundary_excludes_split_point_key() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 10.0),
+        ]));
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let (left, right) = split_animations_at_time_with_options(Some(&animations), at(50), false);
+        assert_eq!(channel_key_count(get_channel(left.as_ref(), "opacity").unwrap()), 1);
+        assert_eq!(channel_key_count(get_channel(right.as_ref(), "opacity").unwrap()), 1);
+    }
+
+    #[test]
+    fn split_discrete_channel_carries_current_value() {
+        let channel = AnimationChannel::Discrete(DiscreteChannel {
+            keys: vec![
+                DiscreteAnimationKey { id: "a".to_string(), time: at(0), value: DiscreteValue::String("x".to_string()) },
+                DiscreteAnimationKey { id: "b".to_string(), time: at(100), value: DiscreteValue::String("y".to_string()) },
+            ],
+        });
+        let animations = animations_with("params.label", ChannelData::Single(channel));
+        let (left, right) = split_animations_at_time_with_options(Some(&animations), at(50), true);
+        let left_channel = get_channel(left.as_ref(), "params.label").unwrap();
+        let AnimationChannel::Discrete(left_discrete) = left_channel else { panic!("expected discrete") };
+        assert_eq!(left_discrete.keys.len(), 2);
+        assert_eq!(left_discrete.keys[1].value, DiscreteValue::String("x".to_string()));
+        let right_channel = get_channel(right.as_ref(), "params.label").unwrap();
+        let AnimationChannel::Discrete(right_discrete) = right_channel else { panic!("expected discrete") };
+        assert_eq!(right_discrete.keys[0].value, DiscreteValue::String("x".to_string()));
+    }
+
+    #[test]
+    fn clamp_animations_drops_beyond_duration_and_keeps_boundary() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 10.0),
+        ]));
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let clamped = clamp_animations_to_duration(Some(&animations), at(40)).unwrap();
+        let channel = get_channel(Some(&clamped), "opacity").unwrap();
+        let AnimationChannel::Scalar(scalar) = channel else { panic!("expected scalar") };
+        assert_eq!(scalar.keys.len(), 2);
+        assert_eq!(scalar.keys[1].time, at(40));
+        assert_eq!(scalar.keys[1].value, 4.0);
+        assert!(clamp_animations_to_duration(Some(&animations), at(0)).is_none());
+        assert!(clamp_animations_to_duration(None, at(10)).is_none());
+    }
+
+    #[test]
+    fn clone_animations_regenerates_ids() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 10.0),
+        ]));
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let cloned = clone_animations(Some(&animations), true).unwrap();
+        let channel = get_channel(Some(&cloned), "opacity").unwrap();
+        let AnimationChannel::Scalar(scalar) = channel else { panic!("expected scalar") };
+        assert_eq!(scalar.keys.len(), 2);
+        assert_ne!(scalar.keys[0].id, "a");
+        assert_ne!(scalar.keys[1].id, "b");
+        assert_eq!(scalar.keys[0].time, at(0));
+
+        let kept = clone_animations(Some(&animations), false).unwrap();
+        let channel = get_channel(Some(&kept), "opacity").unwrap();
+        let AnimationChannel::Scalar(scalar) = channel else { panic!("expected scalar") };
+        assert_eq!(scalar.keys[0].id, "a");
+        assert!(clone_animations(None, true).is_none());
+    }
+
+    #[test]
+    fn update_scalar_keyframe_curve_patches_handles() {
+        let channel = AnimationChannel::Scalar(scalar_channel(vec![
+            scalar_key("a", 0, 0.0),
+            scalar_key("b", 100, 10.0),
+        ]));
+        let animations = animations_with("opacity", ChannelData::Single(channel));
+        let patch = ScalarCurveKeyframePatch {
+            left_handle: None,
+            right_handle: Some(Some(CurveHandle { dt: at(10), dv: 2.0 })),
+            segment_to_next: Some(ScalarSegmentType::Bezier),
+            tangent_mode: Some(TangentMode::Broken),
+        };
+        let updated = update_scalar_keyframe_curve(Some(&animations), "opacity", "value", "a", &patch).unwrap();
+        let channel = get_channel(Some(&updated), "opacity").unwrap();
+        let AnimationChannel::Scalar(scalar) = channel else { panic!("expected scalar") };
+        assert_eq!(scalar.keys[0].segment_to_next, ScalarSegmentType::Bezier);
+        assert_eq!(scalar.keys[0].tangent_mode, TangentMode::Broken);
+        assert_eq!(scalar.keys[0].right_handle.unwrap().dv, 2.0);
+    }
+
+    #[test]
+    fn remove_element_keyframe_across_composite_components() {
+        let mut components = BTreeMap::new();
+        components.insert("r".to_string(), AnimationChannel::Scalar(scalar_channel(vec![scalar_key("k", 0, 1.0)])));
+        components.insert("g".to_string(), AnimationChannel::Scalar(scalar_channel(vec![scalar_key("k", 0, 0.0)])));
+        let animations = animations_with("color", ChannelData::Composite(components));
+        assert!(remove_element_keyframe(Some(&animations), "color", "k").is_none());
+    }
+
+    #[test]
+    fn empty_channels_are_filtered_by_to_animation() {
+        let animations = animations_with(
+            "opacity",
+            ChannelData::Single(AnimationChannel::Scalar(scalar_channel(Vec::new()))),
+        );
+        assert!(to_animation(animations).is_none());
+    }
 }

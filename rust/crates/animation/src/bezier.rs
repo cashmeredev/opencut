@@ -140,17 +140,19 @@ mod tests {
     fn solve_progress_respects_flat_tangents() {
         let mut left = key(0, 0.0);
         left.right_handle = Some(CurveHandle {
-            dt: MediaTime::from_ticks(0),
+            dt: MediaTime::from_ticks(50),
             dv: 0.0,
         });
         let mut right = key(100, 100.0);
         right.left_handle = Some(CurveHandle {
-            dt: MediaTime::from_ticks(0),
+            dt: MediaTime::from_ticks(-50),
             dv: 0.0,
         });
         let early = solve_bezier_progress_for_time(MediaTime::from_ticks(25), &left, &right);
+        let mid = solve_bezier_progress_for_time(MediaTime::from_ticks(50), &left, &right);
         let late = solve_bezier_progress_for_time(MediaTime::from_ticks(75), &left, &right);
         assert!(early < 0.25);
+        assert!((mid - 0.5).abs() < 1e-3);
         assert!(late > 0.75);
     }
 }

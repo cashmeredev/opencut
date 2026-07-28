@@ -4,13 +4,14 @@ use crate::command::{Command, CommandError, CommandResult};
 use crate::project_ext::active_scene_mut;
 
 fn remove_track_elements(track: &mut Track, elements: &[ElementRef]) {
-    if !elements.iter().any(|target| target.track_id == track.id()) {
+    let track_id = track.id().to_string();
+    if !elements.iter().any(|target| target.track_id == track_id) {
         return;
     }
     track.elements_mut().retain(|element| {
         !elements
             .iter()
-            .any(|target| target.track_id == track.id() && target.element_id == element.base().id)
+            .any(|target| target.track_id == track_id && target.element_id == element.base().id)
     });
 }
 

@@ -45,7 +45,10 @@ pub fn parse_color_to_linear_rgba(color: &str) -> Option<LinearRgba> {
             let r = parse_hex_digit(digits.next()?)?;
             let g = parse_hex_digit(digits.next()?)?;
             let b = parse_hex_digit(digits.next()?)?;
-            let a = digits.next().map(parse_hex_digit).transpose()?.unwrap_or(1.0);
+            let a = match digits.next() {
+                Some(digit) => parse_hex_digit(digit)?,
+                None => 1.0,
+            };
             (r, g, b, a)
         }
         6 | 8 => {

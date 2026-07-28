@@ -1,0 +1,11 @@
+[package]
+name = "audio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+animation = { version = "0.1.0", path = "../animation" }
+scene = { version = "0.1.0", path = "../scene" }
+time = { version = "0.1.0", path = "../time" }
+media = { version = "0.1.0", path = "../media" }
+thiserror = "2"

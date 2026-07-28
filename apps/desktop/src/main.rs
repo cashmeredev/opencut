@@ -1,24 +1,17 @@
-use gpui::{
-    div, prelude::*, px, rgb, size, App, Application, Bounds, Context, SharedString, Window,
-    WindowBounds, WindowOptions,
-};
+use std::path::PathBuf;
 
-struct AppWindow {
-    title: SharedString,
-}
+use gpui::{App, AppContext, Application, Bounds, WindowBounds, WindowOptions, px, size};
 
-impl Render for AppWindow {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .size_full()
-            .bg(rgb(0x0f0f0f))
-            .flex()
-            .justify_center()
-            .items_center()
-            .text_xl()
-            .text_color(rgb(0xffffff))
-            .child(self.title.clone())
-    }
+mod app;
+mod projects_view;
+mod theme;
+
+use app::OpenCutApp;
+
+pub fn projects_root() -> PathBuf {
+    std::env::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".local/share/opencut/projects")
 }
 
 fn main() {
@@ -29,11 +22,7 @@ fn main() {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 ..Default::default()
             },
-            |_, cx| {
-                cx.new(|_| AppWindow {
-                    title: "OpenCut".into(),
-                })
-            },
+            |_, cx| cx.new(|cx| OpenCutApp::new(cx)),
         )
         .unwrap();
         cx.activate(true);

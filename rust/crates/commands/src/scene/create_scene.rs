@@ -31,7 +31,13 @@ impl Command for CreateSceneCommand {
     ) -> Result<Option<CommandResult>, CommandError> {
         self.saved_scenes = Some(project.scenes.clone());
 
-        let created = timeline::scenes::build_default_scene(&self.name, self.is_main);
+        let created = timeline::scenes::build_default_scene(
+            uuid::Uuid::new_v4().to_string(),
+            uuid::Uuid::new_v4().to_string(),
+            self.name.clone(),
+            self.is_main,
+            chrono::Utc::now(),
+        );
         self.created_scene_id = Some(created.id.clone());
         project.scenes.push(created);
         Ok(None)

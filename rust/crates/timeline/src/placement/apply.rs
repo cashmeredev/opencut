@@ -46,8 +46,8 @@ pub fn apply_placement(params: &ApplyPlacementParams) -> Option<PlacementApplied
             let insert_index = params
                 .new_track_insert_index_override
                 .unwrap_or(*insert_index);
-            let new_track = build_empty_track(new_track_id.clone(), *track_type, None)
-                .with_elements(params.elements.clone());
+            let mut new_track = build_empty_track(new_track_id.clone(), *track_type, None);
+            *new_track.elements_mut() = params.elements.clone();
 
             let updated_tracks = if *track_type == TrackType::Audio {
                 SceneTracks {
@@ -89,13 +89,3 @@ fn insert_into_audio_tracks(tracks: &SceneTracks, insert_index: usize, track: Tr
     next
 }
 
-trait WithElements {
-    fn with_elements(self, elements: Vec<Element>) -> Self;
-}
-
-impl WithElements for Track {
-    fn with_elements(mut self, elements: Vec<Element>) -> Self {
-        *self.elements_mut() = elements;
-        self
-    }
-}

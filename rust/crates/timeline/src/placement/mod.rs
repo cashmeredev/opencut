@@ -1,4 +1,4 @@
-use scene::{Element, SceneTracks, Track};
+use scene::{SceneTracks, Track};
 use time::MediaTime;
 
 use crate::types::{ElementType, TrackType};
@@ -21,7 +21,7 @@ pub use insert_index::{
 };
 pub use main_track::{MAIN_TRACK_NAME, enforce_main_track_start, get_earliest_main_track_element};
 pub use overlap::can_place_time_spans_on_track;
-pub use resolve::resolve_track_placement;
+pub use resolve::{ResolveTrackPlacementParams, resolve_track_placement};
 pub use track_factory::build_empty_track;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -97,8 +97,4 @@ pub fn ordered_tracks(tracks: &SceneTracks) -> Vec<&Track> {
         .chain(std::iter::once(&tracks.main))
         .chain(tracks.audio.iter())
         .collect()
-}
-
-pub fn track_elements(track: &Track) -> &[Element] {
-    track.elements()
 }

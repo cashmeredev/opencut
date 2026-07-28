@@ -43,7 +43,7 @@ impl Command for AddTrackCommand {
             get_default_insert_index_for_track(&scene.tracks, self.track_type)
         });
 
-        let new_track = build_empty_track(&self.track_id, self.track_type, None);
+        let new_track = build_empty_track(self.track_id.clone(), self.track_type, None);
         if self.track_type == TrackType::Audio {
             let audio_insert_index = insert_index
                 .saturating_sub(scene.tracks.overlay.len() + 1);
