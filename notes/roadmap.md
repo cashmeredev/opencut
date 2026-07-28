@@ -3,6 +3,17 @@
 Working notes for the fork's development direction. Captured 2026-07-26,
 updated 2026-07-28 (GPUI desktop port greenlit — see notes/gpui-port.md).
 
+## Done (2026-07-28 session 2 — GPUI port foundation)
+
+Port greenlit and foundation built (see notes/gpui-port.md session log for
+the full table + next-session entry points). 14 Rust crates, ~300 tests,
+`cargo test --workspace` green. Highlights: scene model + `.ocp`
+round-trip compat with web proven both directions; ffmpeg-next 8 decode;
+timeline/animation/commands/audio/text/graphics/effect-defs/mask-defs
+ports; native wgpu compositor readback proven headless; GPUI projects
+screen builds. Checkpoints: `f5a82152`, `32438ce2`. Next: renderer
+resolve/frame-descriptor, then GPUI preview element.
+
 ## Done (2026-07-28 session)
 
 - Freeze-duration prompt removed; freeze frame uses a fixed 3s (store, dialog, and test deleted).

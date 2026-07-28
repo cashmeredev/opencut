@@ -7,6 +7,74 @@ Captured 2026-07-28. Owner decisions this session:
 - **Licensing is not a constraint** — x264 (GPL) is the H.264 encoder; quality over AppImage-ability. The documented OpenH264 dead end (ignores bitrate, undershoots ~10x) is bypassed entirely.
 - Web version stays and keeps working; the browser editor remains a feature.
 
+## Session log
+
+### Session 1 (2026-07-28) — foundation COMPLETE
+
+`cargo test --workspace` green, ~300 tests, 0 failures. Checkpoints:
+`e837e750` (web session work), `f5a82152` (port foundation), `32438ce2`
+(domain crates).
+
+Done and verified:
+
+| Crate | Tests | Contents |
+|---|---|---|
+| `scene` | 4 | full model, serde round-trip vs web SerializedProject, factory (v32 defaults) |
+| `transfer` | 7 | `.ocp` zip container, cross-compat with web fflate BOTH directions (fixture in tests/fixtures) |
+| `storage` | 7 | filesystem ProjectStore, media store, `.ocp` import/export, id-collision suffix |
+| `media` | 10 | ffmpeg-next 8 decode: frames (seek+forward cache), audio ranges, thumbnails, waveform |
+| `playback` | 10 | wall-clock anchored, frame-rounded clock, volume/mute |
+| `timeline` | 45 | placement, resize/ripple, split, snap, retime, audio separation |
+| `animation` | 73 | bezier solver, sampling, keyframe ops, split/clamp/clone, param defs |
+| `commands` | 9 | Command trait, Batch, history, 19 concrete commands, freeze-frame 1:1 |
+| `audio` | 22 | audible collection, range mixing, mastering limiter, rms buckets |
+| `text` | 19 | cosmic-text layout/measure/raster, backgrounds, decorations |
+| `graphics` | 52 | FULL CSS gradient parser, tiny-skia raster, 4 shape defs |
+| `effect-defs` | 16 | blur def, registry, params→passes |
+| `mask-defs` | 19 | all 9 mask renderers via tiny-skia |
+| `renderer` | 6 | node model + scene builder (resolve/frame-descriptor NOT yet) |
+
+Environment: flake devshell has rust + GPUI native deps + ffmpeg 8.1.2 dev +
+bindgen args. GPUI builds; headless wgpu compositing + texture readback
+proven (compositor/tests/offscreen_render.rs). gpu crate wasm32 compat
+re-verified after readback addition. Desktop app: GPUI projects screen
+(list/create/delete/open via ProjectStore) builds; editor screen is a stub.
+
+Run anything: `nix develop --command cargo test -p <crate>` (cargo is NOT
+on bare PATH; `nix develop` required, also provides ffmpeg/bindgen env).
+
+### Known gaps / next session starts here
+
+1. **renderer resolve + frame-descriptor** — the integration hub. Port
+   `apps/web/src/services/renderer/{resolve.ts, compositor/frame-descriptor.ts}`:
+   node tree → resolve at time t (uses animation sampling, media frames via
+   `media` crate, text measure via `text`, graphic params via `graphics`,
+   mask artifacts via `mask-defs`) → `compositor::FrameDescriptor` + texture
+   uploads. All leaf deps now exist. START HERE.
+2. **GPUI preview element** — paint compositor output (readback → gpui::Image)
+   in the editor screen; wire playback clock → resolve → render loop.
+3. **Audio note**: volume params are DECIBELS (gain=10^(db/20), clamp
+   [-60,20], missing = unity) — audio crate encodes this. maintain_pitch=
+   true returns typed Error::MaintainPitchUnsupported (no soundtouch v1).
+4. **Text mask unification**: mask-defs has its own cosmic-text engine in
+   text_mask.rs; swap to sibling `text` crate's TextEngine if desired.
+5. **cosmic-text gotcha**: Attrs::letter_spacing is EM units; web px value
+   must be divided by scaled font size (already applied in both crates).
+6. **encode crate** — x264 export (compositor frames → ffmpeg encode →
+   mux). ffmpeg-next is proven; nothing written yet.
+7. **Not ported by design**: sounds/stickers/effects PANELS (flagged off in
+   web; data still renders), storage migrations (desktop starts at v32),
+   clipboard commands (browser APIs), keyframe/effect/mask command classes
+   (framework proven; port when editor state needs them), curve-bridge.ts
+   (canvas UI), soundtouch pitch preservation, conic gradients (not in web
+   parser either).
+8. **Web-only side effects intentionally dropped**: EditorCore selection
+   snapshots in history, ripple reactors, insert-element canvas/fps
+   auto-adjust, hidden-element audio exclusion follows contract not web
+   (web keeps hidden video audio in export — revisit at export time).
+9. Agents do NOT use git; Main commits at green checkpoints. Boundary rule:
+   agents never write outside their own crate dir.
+
 ## Why the port
 
 Browser inconsistency (WebGPU quirks, encoder behavior varying by browser)
