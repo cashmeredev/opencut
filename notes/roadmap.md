@@ -1,10 +1,73 @@
 # Roadmap & session notes
 
 Working notes for the fork's development direction. Captured 2026-07-26,
-updated 2026-07-27 (roadmap feature slices implemented, last commit
-`9c3b788b`).
+updated 2026-07-30 (desktop app shipped via Electron; GPUI/Rust rewrite
+parked on the `rust-rewrite` branch).
 
-## Done
+## Done (2026-07-30 session — desktop app + static web)
+
+- Rust rewrite parked: the three GPUI/domain-crate commits live on branch
+  `rust-rewrite` (pushed to both remotes); `main` continues from
+  `e837e750`. `rust/` on main is only the load-bearing wasm compositor.
+- Desktop app (`apps/desktop`): Electron + electron-builder. Serves the
+  static web build over a privileged `opencut://` protocol
+  (`protocol.handle`, streamed, content-type map, traversal guard).
+  Single instance, save-dialog export flow, `shell.showItemInFolder`
+  reveal. Verified on Wayland: projects page renders, preload bridge
+  exposed, `navigator.gpu` present, IndexedDB loads.
+- Native export (the encoding fix): `native-exporter.ts` mirrors
+  `SceneExporter`; frames are grabbed synchronously as `VideoFrame` from
+  the WebGPU canvas (same-task snapshot — the canvas is blank after
+  present), read back as RGBA via `copyTo`, streamed over IPC with
+  drain-backpressure to a bundled ffmpeg (ffmpeg-static, asar-unpacked).
+  libx264 CRF 28/23/19/15 (low→very_high), libvpx-vp9 CRF 40/32/24/16,
+  audio f32le → aac/opus 192k, BT.709 tagged (fixes the colorspace
+  ambiguity too). This replaces the dead-end WebCodecs H.264 path on
+  desktop; web keeps the mediabunny path.
+- Static export: backend deleted (better-auth, drizzle/pg, upstash,
+  botid, freesound proxy, blog, rss, env validation). `next build` emits
+  `out/` with zero env vars. `/editor/[project_id]` → `/editor?project=`
+  (static export can't serve unknown dynamic segments). Dockerfile/
+  docker-compose now build+serve the static export via nginx.
+- Packaging: AppImage/deb/rpm built locally (electron-builder).
+  NixOS quirks solved: fpm needed shebang fix + libxcrypt-legacy on
+  LD_LIBRARY_PATH, rpm target needs `rpmbuild` on PATH. CI (ubuntu)
+  needs none of this.
+- Release pipeline: `.github/workflows/release.yml` on `v*` tags →
+  static web tarball + Linux packages → GitHub release. Published at
+  github.com/cashmeredev/opencut.
+- Changelog 0.4.0 entry written (replaces the stale unpublished
+  upstream draft that sat in `0.4.0.md`).
+- Gates green: bun test 316/1 skip, tsc, `bun build:web`, desktop tsc,
+  ffmpeg encode pipeline e2e-tested against the real ffmpeg-static
+  binary (mp4+audio, webm, webm+audio all decode clean).
+- Human verification still owed: full native export of a real project
+  in the packaged app (save dialog → file on disk → plays correctly).
+
+## Done (2026-07-28 session 2 — GPUI port foundation)
+
+Port greenlit and foundation built (see notes/gpui-port.md session log for
+the full table + next-session entry points). 14 Rust crates, ~300 tests,
+`cargo test --workspace` green. Highlights: scene model + `.ocp`
+round-trip compat with web proven both directions; ffmpeg-next 8 decode;
+timeline/animation/commands/audio/text/graphics/effect-defs/mask-defs
+ports; native wgpu compositor readback proven headless; GPUI projects
+screen builds. Checkpoints: `f5a82152`, `32438ce2`. **Parked 2026-07-30:
+this work lives on branch `rust-rewrite`; resume there.**
+
+## Done (2026-07-28 session)
+
+- Freeze-duration prompt removed; freeze frame uses a fixed 3s (store, dialog, and test deleted).
+- Ripple-extend: dragging the right edge of a static element (image/freeze still/text, i.e. no `sourceDuration`) past its neighbor pushes the whole right-hand chain on that track. Same undo step as the resize; live during drag. Video/audio keep clamping. Core: `timeline/group-resize/compute-resize.ts` + `rightPushChain` from `resize-controller.ts`.
+- Timeline filmstrip: video elements render real per-position thumbnails, density adapts to zoom (power-of-two interval snapping). New `services/thumbnail-cache/` (LRU, batched mediabunny decode) + `timeline/components/video-filmstrip.tsx`. Images unchanged. Verified in browser by agent (distinct tiles, zoom density, viewport clipping, cache clear on media delete).
+- Export hardening (`services/renderer/scene-exporter.ts`, `export-encoding.ts`): bitrate is fps-aware (`w*h*fps*bpp`, high = 0.2 bpp → ~12.4 Mbps at 1080p30, was ~6 fps-blind); keyframe every 2s; export canvas rounded to even dims. A capture-timing change (wait past WebGPU present before snapshot) was tried and REVERTED the same day — the canvas is blank after present, export came out black. Synchronous same-task snapshot is the correct behavior for WebGPU canvases; the temporal-ghosting hypothesis is dead. Colorspace tagging: no API exists (verified mediabunny + lib.dom) — BT.709 vs 601 is Chrome's encoder's call.
+- MP4 export: ffmpeg.wasm + libx264 was implemented (chunked rawvideo → x264 CRF ladder) and then REVERTED at the owner's request after two wasm-side bugs (x264 auto-threading spawns 28 pthreads and hangs the worker — `-threads 4` fixes it; `@ffmpeg/ffmpeg` `writeFile` transfers/detaches the input ArrayBuffer, so chunk buffers must be single-use). The investigation notes stay here in case the idea is revisited; WebM/VP9 export is the owner's daily path and works well. MP4 stays on the mediabunny/WebCodecs avc path (which undershoots bitrate on this machine — OpenH264 ignores bitrateMode, has no quantizer mode, no hardware encoder exists; probe-verified 2026-07-28).
+- Encoder investigation (2026-07-28, probe-verified in the user's Helium): NO hardware H.264 encode exists on the machine; Chrome's OpenH264 ignores `bitrateMode` (byte-identical VBR/CBR output), has no AVC quantizer mode (`isConfigSupported` false), and undershoots to ~0.6 Mbps on real content regardless of configured bitrate (6-50 Mbps). WebCodecs H.264 is a dead end for quality export; x264 via wasm is the only in-browser path. The fps-aware `computeVideoBitrate` still serves the WebM path.
+- Next dev overlay disabled (`devIndicators: false` in `apps/web/next.config.ts`).
+- Gates green: bun test 316 pass / 1 skip, tsc, eslint on touched files, `bun build:web`.
+- Human verification still owed: freeze + ripple-extend click-through by owner.
+
+## Done (2026-07-26/27 session)
 
 - Freeze frame at playhead (snowflake button), composite canvas capture.
 - Freeze frame is a single undo step (`BatchCommand` + `ShiftSplitRemainderCommand`).
@@ -69,13 +132,12 @@ work. The GPUI desktop app sidesteps it entirely (native GPU).
 5. ~~Voice-over recording~~ done.
 6. ~~Git-like project versioning~~ done (v1). v2 candidates: diff view,
    branches, content-addressed media dedup, shipping history inside `.ocp`.
-7. **Self-contained binary, first-class Linux + BSD.** `apps/desktop` (GPUI)
-   is the vehicle but is a hello-world scaffold today; porting the editor is
-   a large effort. Caveat: GPUI's Linux support is young; BSD support is
-   unproven — spike before committing. Browser version stays regardless
-   (editing in a browser is a feature, not a compromise). Distribution:
-   AppImage/GitHub releases first; Flathub is effectively closed to us (June
-   2026 policy bans AI-assisted code in new submissions).
+7. ~~Self-contained binary, first-class Linux + BSD.~~ **DONE
+   2026-07-30 (differently): Electron desktop shell + static web
+   export, native ffmpeg encoding.** The GPUI 1:1 port was parked on
+   branch `rust-rewrite` (foundation + 14 domain crates green, see
+   notes/gpui-port.md) — resume there if the Electron shell ever
+   becomes the bottleneck. BSD still parked.
 
 ## Deprioritized / parked
 

@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76
+        with:
+          bun-version: 1.2.18
+
+      - name: Cache Bun modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.2.18-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build web app (static export)
+        run: bun build:web
+
+      - name: Package static web bundle
+        working-directory: apps/web
+        run: tar -czf ../../opencut-web-static.tar.gz -C out .
+
+      - name: Copy web bundle into desktop app
+        working-directory: apps/desktop
+        run: bun run copy:web
+
+      - name: Build desktop packages (AppImage, deb, rpm)
+        working-directory: apps/desktop
+        run: bun run dist
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            opencut-web-static.tar.gz
+            apps/desktop/release/OpenCut-*-linux-*.AppImage
+            apps/desktop/release/OpenCut-*-linux-*.deb
+            apps/desktop/release/OpenCut-*-linux-*.rpm

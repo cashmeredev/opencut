@@ -515,7 +515,7 @@ function NewProjectButton() {
 		const projectId = await editor.project.createNewProject({
 			name: "New project",
 		});
-		router.push(`/editor/${projectId}`);
+		router.push(`/editor?project=${projectId}`);
 	};
 
 	return (
@@ -553,7 +553,7 @@ function ImportProjectButton() {
 		try {
 			const projectId = await editor.project.importArchive({ file });
 			if (projectId) {
-				router.push(`/editor/${projectId}`);
+				router.push(`/editor?project=${projectId}`);
 			}
 		} finally {
 			setIsImporting(false);
@@ -727,7 +727,7 @@ function ProjectItem({
 				className="size-5 shrink-0"
 			/>
 
-			<Link href={`/editor/${project.id}`} className="flex-1 min-w-0">
+			<Link href={`/editor?project=${project.id}`} className="flex-1 min-w-0">
 				{listRowContent}
 			</Link>
 
@@ -753,7 +753,7 @@ function ProjectItem({
 					<div className="group relative">
 						{isGridView ? (
 							<>
-								<Link href={`/editor/${project.id}`} className="block">
+								<Link href={`/editor?project=${project.id}`} className="block">
 									{gridContent}
 								</Link>
 
@@ -1043,7 +1043,7 @@ function EmptyState() {
 			const projectId = await editor.project.createNewProject({
 				name: "New project",
 			});
-			router.push(`/editor/${projectId}`);
+			router.push(`/editor?project=${projectId}`);
 		} catch (error) {
 			toast.error("Failed to create project", {
 				description:

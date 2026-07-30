@@ -1,162 +1,70 @@
-# OpenCut (Legacy)
+# OpenCut
 
-This is the original OpenCut codebase. It's archived and no longer maintained.
+Offline-first, privacy-first video editor. Your projects and media never leave your device.
 
-The rewrite is happening at [opencut-app/opencut](https://github.com/opencut-app/opencut).
+Continues the abandoned [opencut-app/OpenCut](https://github.com/opencut-app/OpenCut) codebase: the editor was already fully client-side, so the dead backend (auth, database, blog) was ripped out. The web app is now a fully static site, and there is a self-contained Linux desktop app with native ffmpeg exports.
 
-## Sponsors
+## Variants
 
-Thanks to [Vercel](https://vercel.com?utm_source=github-opencut&utm_campaign=oss) and [fal.ai](https://fal.ai?utm_source=github-opencut&utm_campaign=oss) for their support of open-source software.
+- **Desktop (Linux)**: self-contained app — AppImage, `.deb`, `.rpm` on the [releases page](https://github.com/cashmeredev/opencut/releases). Exports are encoded by a bundled ffmpeg (libx264 / libvpx-vp9) instead of the browser encoder, so MP4 quality settings are actually honored and colors are correctly tagged BT.709.
+- **Web**: fully static site, host it anywhere. Grab `opencut-web-static.tar.gz` from releases and serve it with any static file server.
 
-<a href="https://vercel.com/oss">
-  <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge.svg" />
-</a>
+## Project structure
 
-<a href="https://fal.ai">
-  <img alt="Powered by fal.ai" src="https://img.shields.io/badge/Powered%20by-fal.ai-000000?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMEwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEwTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=" />
-</a>
+- `apps/web/`: Next.js editor, built as a static export (`next build` → `out/`). All state lives in IndexedDB.
+- `apps/desktop/`: Electron shell. Serves the static web build over a privileged `opencut://` protocol and bridges exports to a bundled ffmpeg over IPC.
+- `rust/`: wgpu compositor, effects, masks, and time primitives compiled to WASM (`opencut-wasm`).
 
-## Why?
+## Development
 
-- **Privacy**: Your videos stay on your device
-- **Free features**: Most basic CapCut features are now paywalled 
-- **Simple**: People want editors that are easy to use - CapCut proved that
+Prerequisites: [Bun](https://bun.sh/docs/installation). No env files, no database, no Docker.
 
-## Project Structure
+```bash
+bun install
+bun dev:web
+```
 
-- `apps/web/`: Next.js web application
-- `apps/desktop/`: Native desktop app built with GPUI (in progress)
-- `rust/`: Platform-agnostic core: GPU compositor, effects, masks, and WASM bindings. We're actively migrating business logic here from TypeScript.
-- `docs/`: Architecture and subsystem documentation
+The editor is at [http://localhost:3000](http://localhost:3000).
 
-## Getting Started
+### Desktop
 
-### Prerequisites
+```bash
+bun build:web                          # static export -> apps/web/out
+bun run --cwd apps/desktop copy:web    # bundle it into the desktop app
+bun run --cwd apps/desktop dev         # run the shell
+```
 
-- [Bun](https://bun.sh/docs/installation)
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+Package for Linux (AppImage, deb, rpm into `apps/desktop/release/`):
 
-> **Note:** Docker is optional but recommended for running the local database and Redis. If you only want to work on frontend features, you can skip it.
-
-### Setup
-
-1. Fork and clone the repository
-
-2. Copy the environment file:
-
-   ```bash
-   # Unix/Linux/Mac
-   cp apps/web/.env.example apps/web/.env.local
-
-   # Windows PowerShell
-   Copy-Item apps/web/.env.example apps/web/.env.local
-   ```
-
-3. Start the database and Redis:
-
-   ```bash
-   docker compose up -d db redis serverless-redis-http
-   ```
-
-4. Install dependencies and start the dev server:
-
-   ```bash
-   bun install
-   bun dev:web
-   ```
-
-The application will be available at [http://localhost:3000](http://localhost:3000).
-
-The `.env.example` has sensible defaults that match the Docker Compose config — it should work out of the box.
-
-### Desktop setup
-
-Desktop is opt-in. If you're only working on the web app, skip this entirely.
-
-If you want to get ready for `apps/desktop`, see [`apps/desktop/README.md`](apps/desktop/README.md). It's a two-step setup: Rust toolchain first, then desktop native dependencies.
+```bash
+bun run --cwd apps/desktop dist
+```
 
 ### Local WASM development
 
-Only needed if you're editing `rust/wasm` and want the web app to use your local build instead of the published package.
-
-**Prerequisites** — install these once before anything else:
+Only needed if you're editing `rust/wasm` and want the web app to use your local build instead of the published package. Requires a Rust toolchain, `wasm-pack`, and `cargo-watch`:
 
 ```bash
-# Rust toolchain
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# build the WASM package
-cargo install wasm-pack
-
-# reruns the build on file changes, used by bun dev:wasm
-cargo install cargo-watch
+bun run build:wasm        # build once
+cd rust/wasm/pkg && bun link
+cd apps/web && bun link opencut-wasm
+bun dev:wasm              # rebuild on changes
 ```
 
-1. Build the package once from the repo root:
+Switch back to the published package with `cd apps/web && bun add opencut-wasm`.
 
-   ```bash
-   bun run build:wasm
-   ```
-
-2. Register the generated package for linking:
-
-   ```bash
-   cd rust/wasm/pkg
-   bun link
-   ```
-
-3. Link `apps/web` to the local package:
-
-   ```bash
-   cd apps/web
-   bun link opencut-wasm
-   ```
-
-4. Rebuild on changes while you work:
-
-   ```bash
-   bun dev:wasm
-   ```
-
-To switch `apps/web` back to the published package, run:
-
-```bash
-cd apps/web
-bun add opencut-wasm
-```
-
-### Self-Hosting with Docker
-
-To run everything (including a production build of the app) in Docker:
+### Self-hosting the web app
 
 ```bash
 docker compose up -d
 ```
 
-The app will be available at [http://localhost:3100](http://localhost:3100).
+Serves the static build at [http://localhost:3000](http://localhost:3000). Any static file server works — the build output is `apps/web/out/`.
 
-## Contributing
+## Releases
 
-We welcome contributions! While we're actively developing and refactoring certain areas, there are plenty of opportunities to contribute effectively.
-
-**🎯 Focus areas:** Timeline functionality, project management, performance, bug fixes, and UI improvements outside the preview panel.
-
-**⚠️ Avoid for now:** Preview panel enhancements (fonts, stickers, effects) and export functionality - we're refactoring these with a new binary rendering approach.
-
-See our [Contributing Guide](.github/CONTRIBUTING.md) for detailed setup instructions, development guidelines, and complete focus area guidance.
-
-**Quick start for contributors:**
-
-- Fork the repo and clone locally
-- Follow the setup instructions in CONTRIBUTING.md
-- Working on `apps/desktop`? See [`apps/desktop/README.md`](apps/desktop/README.md) for setup
-- Create a feature branch and submit a PR
+Tags (`v*`) trigger the GitHub release workflow: static web tarball plus AppImage, `.deb`, and `.rpm`.
 
 ## License
 
 [MIT LICENSE](LICENSE)
-
----
-
-![Star History Chart](https://api.star-history.com/svg?repos=opencut-app/opencut&type=Date)
-

@@ -15,6 +15,8 @@ import { CopyMarkdownButton } from "@/changelog/components/copy-markdown-button"
 
 type Props = { params: Promise<{ version: string }> };
 
+export const dynamicParams = false;
+
 export async function generateStaticParams() {
 	return getSortedReleases().map((release) => ({ version: release.version }));
 }

@@ -23,6 +23,7 @@ export interface ExportOptions {
 export interface ExportResult {
 	success: boolean;
 	buffer?: ArrayBuffer;
+	filePath?: string;
 	error?: string;
 	cancelled?: boolean;
 }

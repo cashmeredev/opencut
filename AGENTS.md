@@ -10,7 +10,7 @@ Bun + Turborepo monorepo with three pillars:
 
 1. `apps/web` — Next.js 16 (App Router, Turbopack dev) React 19 editor. Consumes the Rust core as the npm dependency `opencut-wasm`.
 2. `rust/` — Cargo workspace (root `Cargo.toml`) of 6 shared crates (`time`, `bridge`, `effects`, `gpu`, `masks`, `compositor`; wgpu + WGSL shaders) plus `rust/wasm`, the cdylib compiled by wasm-pack into `rust/wasm/pkg` and published as `opencut-wasm`. Business logic is actively migrating from TypeScript to here.
-3. `apps/desktop` — GPUI 0.2.2 native app, currently a hello-world scaffold window. Ignore unless explicitly working on it.
+3. `apps/desktop` — Electron shell for Linux. Serves the static web build over a privileged `opencut://` protocol and bridges exports to a bundled ffmpeg (libx264/libvpx-vp9) over IPC (`src/export.ts`). The renderer-side native exporter lives in `apps/web/src/services/renderer/native-exporter.ts` and activates automatically when the preload bridge (`window.opencutDesktop`) is present.
 
 The web app has a hybrid state architecture:
 
@@ -37,7 +37,7 @@ Typical flow (split at playhead, key "s"): keybindings-store → `invokeAction("
 | `apps/web/src/project/transfer/` | Single-file `.ocp` import/export (fflate zip: project.json + media + manifest) |
 | `apps/web/src/features.ts` | `FEATURES` flags hiding unfinished upstream domains (sounds/stickers/effects) from the UI |
 | `apps/web/src/components/` | Shared React: `ui/` (shadcn-style radix), `editor/`, `providers/` |
-| `apps/web/src/app/` | App Router pages + `api/` routes |
+| `apps/web/src/app/` | App Router pages (static export) |
 | `rust/crates/` | Shared Rust crates; `rust/wasm/` compiles them to the `opencut-wasm` npm package |
 | `docs/` | Subsystem docs: `actions.md`, `keyframes.md`, `effects-renderer.md`, `countries-search.md` |
 | `notes/` | Design notes (e.g. `primitives-vs-domains.md`) |
@@ -50,20 +50,22 @@ Run from repo root unless noted. `flake.nix` provides a devshell (`nix develop`)
 
 ```bash
 bun install
-cp apps/web/.env.example apps/web/.env.local   # required; zod validates env at import time
-docker compose up -d db redis serverless-redis-http   # optional; not needed for editor work
-bun dev:web        # http://localhost:3000 (editor at /editor/<project_id>)
-bun build:web      # next build via turbo
+bun dev:web        # http://localhost:3000
+bun build:web      # static export via turbo -> apps/web/out
 bun test           # all JS/TS tests (Bun test runner)
 bun lint:web       # eslint apps/web/src
 bun lint:web:fix   # with --fix
 ```
 
-Inside `apps/web`: `bun run dev`, `bun run format` (prettier all of `src`), `bun run db:migrate` / `db:generate` (drizzle-kit), `bun run preview` / `deploy` (OpenNext → Cloudflare Workers). Typecheck with `bunx tsc --noEmit` (no script exists; see Testing & QA for pre-existing errors).
+No env files, no database — the backend was deleted; the editor is fully client-side on IndexedDB.
 
-WASM (only when editing `rust/`): `./script/setup-rust` installs rustup + wasm-pack; then `bun build:wasm` (wasm-pack → `rust/wasm/pkg`), `bun dev:wasm` (cargo-watch rebuild), and `bun link` in `rust/wasm/pkg` + `bun link opencut-wasm` in `apps/web` to use the local build (`bun add opencut-wasm` to revert). Rust tests: `cargo test -p <crate>`. Desktop: `cargo run -p opencut-desktop` after `apps/desktop/script/setup`.
+Inside `apps/web`: `bun run dev`, `bun run format` (prettier all of `src`). Typecheck with `bunx tsc --noEmit` (no script exists; see Testing & QA for pre-existing errors).
 
-Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postgres 17, redis 7, serverless-redis-http Upstash shim on :8079).
+Desktop: `bun build:web` first, then `bun run --cwd apps/desktop copy:web` (bundles `apps/web/out`), `bun run --cwd apps/desktop dev` to run, `bun run --cwd apps/desktop dist` to build AppImage/deb/rpm into `apps/desktop/release/`. Tags `v*` trigger `.github/workflows/release.yml` (static web tarball + Linux packages).
+
+WASM (only when editing `rust/`): install rustup + wasm-pack + cargo-watch, then `bun build:wasm` (wasm-pack → `rust/wasm/pkg`), `bun dev:wasm` (cargo-watch rebuild), and `bun link` in `rust/wasm/pkg` + `bun link opencut-wasm` in `apps/web` to use the local build (`bun add opencut-wasm` to revert). Rust tests: `cargo test -p <crate>`.
+
+Self-hosting: `docker compose up -d` (nginx serving the static build at http://localhost:3000).
 
 ## Code Conventions & Common Patterns
 
@@ -82,7 +84,7 @@ Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postg
 | File | Role |
 |---|---|
 | `apps/web/src/app/layout.tsx` | Root layout (ThemeProvider, TooltipProvider, Toaster) |
-| `apps/web/src/app/editor/[project_id]/page.tsx` | Editor page — resizable panels inside `EditorProvider` |
+| `apps/web/src/app/editor/page.tsx` | Editor page (`?project=<id>`) — resizable panels inside `EditorProvider` |
 | `apps/web/src/components/providers/editor-provider.tsx` | Loads project, initializes GPU renderer, mounts actions + keybindings |
 | `apps/web/src/core/index.ts` | EditorCore singleton; wires all managers + command reactor |
 | `apps/web/src/core/managers/commands.ts` | Undo/redo history, selection overrides, reactors, ripple |
@@ -90,18 +92,19 @@ Self-hosting: `docker compose up -d` (full stack at http://localhost:3100; postg
 | `apps/web/src/actions/use-editor-actions.ts` | Action handler implementations |
 | `apps/web/src/commands/base-command.ts` | `abstract class Command` contract |
 | `apps/web/src/wasm/media-time.ts` | Branded MediaTime type + validated wasm wrappers |
-| `apps/web/src/db/schema.ts` | Drizzle schema (note: `apps/web/drizzle.config.ts` points at the stale path `./src/lib/db/schema.ts`) |
+| `apps/web/src/desktop/bridge.ts` | Typed `window.opencutDesktop` bridge detection (Electron preload) |
+| `apps/web/src/services/renderer/native-exporter.ts` | Desktop export path: frames → IPC → ffmpeg (mirrors `SceneExporter`) |
 | `eslint.config.mjs` | Flat ESLint config + inline `eslint-plugin-opencut` |
 | `turbo.json` | Task graph (build/dev/preview/deploy/lint/format) |
-| `apps/web/wrangler.jsonc` + `open-next.config.ts` | Cloudflare Workers deploy target via OpenNext |
-| `docker-compose.yml`, `apps/web/Dockerfile` | Local services + self-hosted production image |
+| `apps/desktop/electron-builder.yml` | Linux packaging: AppImage/deb/rpm, artifact naming |
+| `docker-compose.yml`, `apps/web/Dockerfile` | Self-hosted static build via nginx |
 
 ## Runtime/Tooling Preferences
 
 - Bun is the package manager and script runner, pinned `1.2.18` via `packageManager` in root and `apps/web/package.json`; bun 1.3.x (from the Nix devshell) also works for install/dev/tsc. Lockfile: root `bun.lock` only. `.npmrc`: `install-strategy=nested`, `node-linker=isolated`.
 - No `engines` field; Node 24 comes from the devshell but the app is built/run by bun and Next. CI pins bun 1.2.18.
-- Rust toolchain (rustup, wasm-pack, cargo-watch) is needed ONLY for `rust/` or `apps/desktop` work — install via `script/setup-rust`. The web app normally uses the published `opencut-wasm` npm package; no local Rust required for editor work.
-- Deploy target is Cloudflare Workers via `@opennextjs/cloudflare` (worker name `opencut`); self-hosting alternative is the Docker standalone build. Root `wrangler.jsonc` duplicates the apps/web one — edit `apps/web/wrangler.jsonc`.
+- Rust toolchain (rustup, wasm-pack, cargo-watch) is needed ONLY for `rust/` work. The web app normally uses the published `opencut-wasm` npm package; no local Rust required for editor work.
+- Distribution: GitHub Releases (tag-triggered) — static web tarball + Linux desktop packages. Self-hosting alternative is the nginx Docker image.
 - Dead config to ignore: root `build:tools`/`dev:tools`/`start:tools` scripts (target nonexistent `@opencut/tools`), turbo `check-types` task (no package implements it), root `format:web` (formats only `src/services/renderer`; use `bun run format` in apps/web), `packages/` workspace glob (empty).
 
 ## Testing & QA

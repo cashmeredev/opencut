@@ -1,5 +1,10 @@
 node_modules
 .next
+.turbo
+out
+target
+apps/desktop
+rust
 .git
 .gitignore
 *.md

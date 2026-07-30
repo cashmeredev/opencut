@@ -34,6 +34,8 @@ import {
 } from "@/components/section";
 import { useEditor } from "@/editor/use-editor";
 import { DEFAULT_EXPORT_OPTIONS } from "@/export/defaults";
+import { getDesktopBridge } from "@/desktop/bridge";
+import { toast } from "sonner";
 
 function isExportFormat(value: string): value is ExportFormat {
 	return EXPORT_FORMAT_VALUES.some((formatValue) => formatValue === value);
@@ -125,6 +127,22 @@ function ExportPopover({
 
 		if (result.cancelled) {
 			editor.project.clearExportState();
+			return;
+		}
+
+		const filePath = result.success ? result.filePath : undefined;
+		if (result.success && filePath) {
+			toast.success(`Export saved to ${filePath}`, {
+				action: {
+					label: "Reveal",
+					onClick: () => {
+						getDesktopBridge()?.revealFile(filePath);
+					},
+				},
+			});
+
+			editor.project.clearExportState();
+			onOpenChange(false);
 			return;
 		}
 

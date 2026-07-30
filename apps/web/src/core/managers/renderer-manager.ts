@@ -3,6 +3,8 @@ import type { RootNode } from "@/services/renderer/nodes/root-node";
 import type { ExportOptions, ExportResult } from "@/export";
 import { CanvasRenderer } from "@/services/renderer/canvas-renderer";
 import { SceneExporter } from "@/services/renderer/scene-exporter";
+import { NativeExporter } from "@/services/renderer/native-exporter";
+import { getDesktopBridge } from "@/desktop/bridge";
 import { buildScene } from "@/services/renderer/scene-builder";
 import { createTimelineAudioBuffer } from "@/media/audio";
 import { formatTimecode } from "opencut-wasm";
@@ -214,7 +216,7 @@ export class RendererManager {
 				background: activeProject.settings.background,
 			});
 
-			const exporter = new SceneExporter({
+			const exportParams = {
 				width: exportSize.width,
 				height: exportSize.height,
 				fps: exportFps,
@@ -222,7 +224,33 @@ export class RendererManager {
 				quality,
 				shouldIncludeAudio: !!includeAudio,
 				audioBuffer: audioBuffer || undefined,
-			});
+			};
+
+			type ProjectExporter = {
+				on(
+					event: "progress",
+					listener: (progress: number) => void,
+				): unknown;
+				cancel(): void;
+				export({
+					rootNode,
+				}: {
+					rootNode: RootNode;
+				}): Promise<ArrayBuffer | string | null>;
+			};
+
+			let exporter: ProjectExporter;
+			if (getDesktopBridge()) {
+				const safeName =
+					activeProject.metadata.name.replace(/[<>:"/\\|?*]/g, "-").trim() ||
+					"export";
+				exporter = new NativeExporter({
+					...exportParams,
+					fileName: `${safeName}.${format}`,
+				});
+			} else {
+				exporter = new SceneExporter(exportParams);
+			}
 
 			exporter.on("progress", (progress) => {
 				const adjustedProgress = includeAudio
@@ -242,20 +270,24 @@ export class RendererManager {
 			const cancelInterval = setInterval(checkCancel, 100);
 
 			try {
-				const buffer = await exporter.export({ rootNode: scene });
+				const result = await exporter.export({ rootNode: scene });
 				clearInterval(cancelInterval);
 
 				if (cancelled) {
 					return { success: false, cancelled: true };
 				}
 
-				if (!buffer) {
+				if (typeof result === "string") {
+					return { success: true, filePath: result };
+				}
+
+				if (!result) {
 					return { success: false, error: "Export failed to produce buffer" };
 				}
 
 				return {
 					success: true,
-					buffer,
+					buffer: result,
 				};
 			} finally {
 				clearInterval(cancelInterval);

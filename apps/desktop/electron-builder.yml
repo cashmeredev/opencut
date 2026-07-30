@@ -1,0 +1,28 @@
+appId: rs.cashmere.opencut
+productName: OpenCut
+directories:
+  output: release
+files:
+  - dist/**
+  - package.json
+asarUnpack:
+  - "**/ffmpeg-static/**"
+extraResources:
+  - from: web
+    to: web
+linux:
+  executableName: opencut
+  icon: build/icon.png
+  syncDesktopName: true
+  category: AudioVideo;Video
+  target:
+    - AppImage
+    - deb
+    - rpm
+  artifactName: OpenCut-${version}-linux-${arch}.${ext}
+deb:
+  maintainer: cashmere
+  description: Offline-first video editor
+rpm:
+  maintainer: cashmere
+  description: Offline-first video editor

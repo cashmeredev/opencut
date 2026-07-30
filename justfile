@@ -52,7 +52,7 @@ verify:
     cd apps/web && bunx tsc --noEmit
     bun build:web
 
-# Build the Rust WASM package (run ./script/setup-rust once first)
+# Build the Rust WASM package (requires rustup + wasm-pack)
 wasm:
     bun build:wasm
 
@@ -64,9 +64,13 @@ wasm-watch:
 rust-test crate:
     cargo test -p {{crate}}
 
-# Run the GPUI desktop app (after apps/desktop/script/setup)
+# Run the Electron desktop app (requires apps/web/out via bun build:web + just desktop-web)
 desktop:
-    cargo run -p opencut-desktop
+    bun run --cwd apps/desktop dev
+
+# Copy the static web bundle into the desktop app
+desktop-web:
+    bun run --cwd apps/desktop copy:web
 
 # Start optional local services (postgres, redis) — not needed for editor work
 services:
