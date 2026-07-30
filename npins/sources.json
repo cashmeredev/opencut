@@ -1,0 +1,18 @@
+{
+  "pins": {
+    "inter": {
+      "type": "Url",
+      "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "unpack": true,
+      "hash": "sha256-5vdKKvHAeZi6igrfpbOdhZlDX2/5+UvzlnCQV6DdqoQ="
+    },
+    "nixpkgs": {
+      "type": "Channel",
+      "name": "nixpkgs-unstable",
+      "artifact": "nixexprs.tar.xz",
+      "url": "https://releases.nixos.org/nixpkgs/nixpkgs-26.11pre1043539.9bc02893134c/nixexprs.tar.xz",
+      "hash": "sha256-PlAXr9kpfXhMFU0OQ7qtE8FhLQo21WXFVGqIC85UFyc="
+    }
+  },
+  "version": 8
+}

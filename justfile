@@ -1,4 +1,4 @@
-# Common commands for the OpenCut fork. Run inside the devshell (`nix develop`)
+# Common commands for the OpenCut fork. Run inside the devshell (`nix-shell`)
 # or anywhere bun + node are on PATH. `just` lists all recipes.
 
 default:
