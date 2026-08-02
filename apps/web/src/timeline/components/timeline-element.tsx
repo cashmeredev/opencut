@@ -605,6 +605,12 @@ function ElementInner({
 				</div>
 			</div>
 
+			{FEATURES.effects &&
+				(element.type === "video" || element.type === "image") &&
+				hasElementEffects({ element }) && (
+					<EffectsButton element={element} track={track} />
+				)}
+
 			{isSelected && (
 				<>
 					<ResizeHandle
@@ -1074,7 +1080,8 @@ function EffectsButton({
 	return (
 		<button
 			type="button"
-			className="flex shrink-0 justify-center text-white cursor-pointer"
+			className="absolute top-1 left-1 z-10 flex shrink-0 justify-center text-white cursor-pointer"
+			aria-label="Open effects"
 			onMouseDown={(event) => event.stopPropagation()}
 			onClick={handleClick}
 		>
@@ -1135,7 +1142,7 @@ function VideoElementContent({
 				name={mediaAsset.name}
 				leading={
 					FEATURES.effects && hasElementEffects({ element }) ? (
-						<EffectsButton element={element} track={track} />
+						<div className="w-3" />
 					) : null
 				}
 				hasFade={true}
@@ -1184,7 +1191,7 @@ function ImageElementContent({
 				name={mediaAsset?.name}
 				leading={
 					FEATURES.effects && hasElementEffects({ element }) ? (
-						<EffectsButton element={element} track={track} />
+						<div className="w-3" />
 					) : null
 				}
 				hasFade={true}
