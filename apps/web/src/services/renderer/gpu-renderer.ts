@@ -4,6 +4,25 @@ import {
 	initializeGpu,
 } from "opencut-wasm";
 import type { EffectPass, EffectUniformValue } from "@/effects/types";
+import { wasmCompositor } from "./compositor/wasm-compositor";
+
+const canvasRepairListeners = new Set<() => void>();
+
+export function onGpuCanvasRepaired({
+	callback,
+}: {
+	callback: () => void;
+}): () => void {
+	canvasRepairListeners.add(callback);
+	return () => canvasRepairListeners.delete(callback);
+}
+
+function repairSharedCompositorCanvas(): void {
+	wasmCompositor.repairSharedCanvas();
+	for (const listener of canvasRepairListeners) {
+		listener();
+	}
+}
 
 let gpuAvailable = false;
 let initPromise: Promise<void> | null = null;
@@ -43,12 +62,14 @@ export const gpuRenderer = {
 			return source;
 		}
 
-		return applyEffectPasses({
+		const result = applyEffectPasses({
 			source,
 			width,
 			height,
 			passes: serializeEffectPasses(passes),
 		});
+		repairSharedCompositorCanvas();
+		return result;
 	},
 
 	applyMaskFeather({
@@ -66,12 +87,14 @@ export const gpuRenderer = {
 			return maskCanvas;
 		}
 
-		return applyMaskFeatherWasm({
+		const result = applyMaskFeatherWasm({
 			mask: maskCanvas,
 			width,
 			height,
 			feather,
 		});
+		repairSharedCompositorCanvas();
+		return result;
 	},
 };
 

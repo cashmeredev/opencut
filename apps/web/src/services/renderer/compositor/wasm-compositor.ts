@@ -96,6 +96,14 @@ class WasmCompositor {
 		}
 	}
 
+	repairSharedCanvas() {
+		if (!this.canvas || !this.initializedSize) return;
+		const { width, height } = this.initializedSize;
+		if (this.canvas.width === width && this.canvas.height === height) return;
+		resizeCompositor(width + 1, height);
+		resizeCompositor(width, height);
+	}
+
 	private syncExternalTexture(texture: ExternalTextureDescriptor) {
 		const previous = this.cache.get(texture.id);
 		if (

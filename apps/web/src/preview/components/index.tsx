@@ -7,6 +7,7 @@ import { useRafLoop } from "@/hooks/use-raf-loop";
 import { useContainerSize } from "@/hooks/use-container-size";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { CanvasRenderer } from "@/services/renderer/canvas-renderer";
+import { onGpuCanvasRepaired } from "@/services/renderer/gpu-renderer";
 import { TICKS_PER_SECOND } from "@/wasm";
 import type { RootNode } from "@/services/renderer/nodes/root-node";
 import { buildScene } from "@/services/renderer/scene-builder";
@@ -212,6 +213,14 @@ function PreviewCanvas({
 	}, [renderer, renderTree, editor.playback, editor.timeline]);
 
 	useRafLoop(render);
+
+	useEffect(() => {
+		return onGpuCanvasRepaired({
+			callback: () => {
+				lastFrameRef.current = -1;
+			},
+		});
+	}, []);
 
 	useEffect(() => {
 		const container = viewportRef.current;

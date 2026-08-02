@@ -81,13 +81,11 @@ pub fn resize_compositor(width: u32, height: u32) -> Result<(), JsValue> {
             };
             runtime.canvas.set_width(width);
             runtime.canvas.set_height(height);
-            if runtime.surface_size != (width, height) {
-                gpu_runtime
-                    .context
-                    .configure_surface(&runtime.surface, width, height)
-                    .map_err(|error| JsValue::from_str(&error.to_string()))?;
-                runtime.surface_size = (width, height);
-            }
+            gpu_runtime
+                .context
+                .configure_surface(&runtime.surface, width, height)
+                .map_err(|error| JsValue::from_str(&error.to_string()))?;
+            runtime.surface_size = (width, height);
             Ok(())
         })
     })

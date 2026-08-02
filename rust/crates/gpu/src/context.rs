@@ -604,6 +604,10 @@ impl GpuContext {
         width: u32,
         height: u32,
     ) -> Result<(), GpuError> {
+        let previous_size = self
+            .gl_canvas
+            .as_ref()
+            .map(|gl_canvas| (gl_canvas.width(), gl_canvas.height()));
         let gl_canvas = self.render_texture_to_gl_canvas_surface(texture, width, height)?;
 
         let ctx: web_sys::OffscreenCanvasRenderingContext2d = canvas
@@ -615,6 +619,11 @@ impl GpuContext {
         ctx.clear_rect(0.0, 0.0, width as f64, height as f64);
         ctx.draw_image_with_html_canvas_element(gl_canvas, 0.0, 0.0)
             .map_err(|_| GpuError::AdapterUnavailable)?;
+
+        if let Some((previous_width, previous_height)) = previous_size {
+            gl_canvas.set_width(previous_width);
+            gl_canvas.set_height(previous_height);
+        }
 
         Ok(())
     }
