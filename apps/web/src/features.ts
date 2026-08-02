@@ -7,5 +7,5 @@
 export const FEATURES = {
 	sounds: false,
 	stickers: false,
-	effects: false,
+	effects: true,
 } as const;
