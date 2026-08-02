@@ -23,6 +23,19 @@ export interface EffectPassTemplate {
 	}): Record<string, EffectUniformValue>;
 }
 
+export interface MotionOffset {
+	scale: number;
+	translateX: number;
+	translateY: number;
+}
+
+export interface EffectMotionConfig {
+	evaluate(params: {
+		effectParams: ParamValues;
+		progress: number;
+	}): MotionOffset;
+}
+
 export interface EffectRendererConfig {
 	passes: EffectPassTemplate[];
 	buildPasses?: (params: {
@@ -38,4 +51,6 @@ export interface EffectDefinition {
 	keywords: string[];
 	params: ParamDefinition[];
 	renderer: EffectRendererConfig;
+	motion?: EffectMotionConfig;
+	supportsStandalone?: boolean;
 }

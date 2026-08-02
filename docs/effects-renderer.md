@@ -15,6 +15,16 @@ An effect definition has:
 
 All effects use the shared GPU renderer. TypeScript decides which shader identifiers to run and which uniforms to pass. Rust/wgpu owns device creation, textures, and pass execution.
 
+## Motion presets (pan & zoom)
+
+Effects can also modulate an element's transform instead of running shader passes. A definition with a `motion` config (see `apps/web/src/effects/definitions/motion.ts`) evaluates a per-frame `MotionOffset` (scale multiplier + translate as canvas fraction) from an eased progress over the clip duration. `applyMotionEffects` in `apps/web/src/effects/motion.ts` composes these onto the resolved transform in `resolveVisualState`, so they work in preview and export and stack with keyframed transforms.
+
+- Built-in presets: `zoom-in`, `zoom-out`, `pan-left/right/up/down`
+- `intensity` (0–100, keyframable) scales the whole effect proportionally
+- `easing` (select) maps linear progress through the graph editor's `BUILTIN_PRESETS` cubic-beziers — non-linear by default ("smooth")
+- Motion effects set `supportsStandalone: false` — they only make sense on a clip, so the assets panel hides the add-to-timeline button and dropping on empty timeline space is a no-op
+- `renderer.passes` is `[]` for motion-only effects; they contribute no shader work
+
 ## Single-pass vs multi-pass
 
 The renderer supports a `passes` array. Single-pass effects (e.g. color grading) just have one entry. Multi-pass is needed when an effect has to process its own output — blur (H then V), bloom (extract → blur → composite), glow, etc.

@@ -15,6 +15,7 @@ import {
 	buildEffectElement,
 } from "@/timeline/element-utils";
 import { AddTrackCommand, InsertElementCommand } from "@/commands/timeline";
+import { effectsRegistry } from "@/effects";
 import { BatchCommand } from "@/commands";
 import type { Command } from "@/commands/base-command";
 import { computeDropTarget } from "@/timeline/components/drop-target";
@@ -467,6 +468,10 @@ export class DragDropController {
 				elementId: target.targetElement.elementId,
 				effectType: dragData.effectType,
 			});
+			return;
+		}
+
+		if (effectsRegistry.get(dragData.effectType).supportsStandalone === false) {
 			return;
 		}
 

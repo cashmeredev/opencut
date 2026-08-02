@@ -6,6 +6,7 @@ import {
 	intensityToSigma,
 } from "@/effects/definitions/blur";
 import { effectsRegistry, resolveEffectPasses } from "@/effects";
+import { applyMotionEffects } from "@/effects/motion";
 import type { Effect, EffectPass } from "@/effects/types";
 import { getSourceTimeAtClipTime } from "@/retime";
 import {
@@ -125,7 +126,8 @@ function resolveEffectPassGroups({
 				width,
 				height,
 			});
-		});
+		})
+		.filter((passes) => passes.length > 0);
 }
 
 function resolveVisualState({
@@ -149,10 +151,18 @@ function resolveVisualState({
 		elementStartTime: params.timeOffset,
 		elementDuration: params.duration,
 	});
-	const transform = resolveTransformAtTime({
-		baseTransform: params.transform,
+	const transform = applyMotionEffects({
+		baseTransform: resolveTransformAtTime({
+			baseTransform: params.transform,
+			animations: params.animations,
+			localTime,
+		}),
+		effects: params.effects,
 		animations: params.animations,
 		localTime,
+		duration: params.duration,
+		canvasWidth: context.renderer.width,
+		canvasHeight: context.renderer.height,
 	});
 	const opacity = resolveOpacityAtTime({
 		baseOpacity: params.opacity,
